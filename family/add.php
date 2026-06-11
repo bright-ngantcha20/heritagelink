@@ -190,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo,
             $myMember['member_id'],
             $new_member_id,
-            $db_type
+            $db_type,
             $my_relation
         );
 
