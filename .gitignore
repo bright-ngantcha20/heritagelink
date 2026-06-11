@@ -1,0 +1,58 @@
+# ─── Database credentials ─────────────────────────────────
+# Never commit your database password to GitHub
+config.php
+
+# ─── User uploaded files ──────────────────────────────────
+# These can be large and contain personal data
+uploads/photos/*
+uploads/documents/*
+uploads/audio/*
+
+# Keep the folder structure but ignore the files inside
+!uploads/photos/.gitkeep
+!uploads/documents/.gitkeep
+!uploads/audio/.gitkeep
+
+# ─── Operating system files ───────────────────────────────
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Code editor files ────────────────────────────────────
+# VS Code
+.vscode/
+
+# JetBrains (PHPStorm)
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ─── PHP logs and errors ──────────────────────────────────
+*.log
+error_log
+php_errorlog
+
+# ─── XAMPP / WAMP local config ────────────────────────────
+php.ini
+my.ini
+.env
+
+# ─── Node (if you use npm for anything) ───────────────────
+node_modules/
+npm-debug.log
+
+# ─── Temporary files ──────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
