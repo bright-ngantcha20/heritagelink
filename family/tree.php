@@ -26,8 +26,6 @@ $myMember = getUserMember($pdo, $user['id']);
     background: #0a0a18;
     position: relative;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
 }
 
 #tree-toolbar {
@@ -42,7 +40,7 @@ $myMember = getUserMember($pdo, $user['id']);
 }
 
 .toolbar-btn {
-    background: rgba(17,17,39,0.92);
+    background: rgba(17,17,39,0.95);
     border: 1px solid #1e1e3a;
     color: #aaa;
     padding: 0.45rem 1rem;
@@ -75,26 +73,16 @@ $myMember = getUserMember($pdo, $user['id']);
     width: 100%;
     height: 100%;
     cursor: grab;
+    user-select: none;
 }
 
 #tree-svg:active { cursor: grabbing; }
 
-/* Node card */
-.node-card {
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.node-card:hover .card-bg {
-    filter: brightness(1.25);
-}
-
-/* Links */
 .link-parent {
     stroke: #4a90d9;
     stroke-width: 2;
     fill: none;
-    opacity: 0.6;
+    opacity: 0.7;
 }
 
 .link-spouse {
@@ -102,7 +90,7 @@ $myMember = getUserMember($pdo, $user['id']);
     stroke-width: 1.5;
     fill: none;
     stroke-dasharray: 6,3;
-    opacity: 0.5;
+    opacity: 0.6;
 }
 
 .link-sibling {
@@ -110,10 +98,25 @@ $myMember = getUserMember($pdo, $user['id']);
     stroke-width: 1.5;
     fill: none;
     stroke-dasharray: 3,4;
-    opacity: 0.4;
+    opacity: 0.5;
 }
 
-/* Zoom controls */
+.node-card {
+    cursor: pointer;
+}
+
+.node-card .card-bg {
+    transition: filter 0.15s;
+}
+
+.node-card:hover .card-bg {
+    filter: brightness(1.3);
+}
+
+.node-card.selected .card-bg {
+    filter: brightness(1.5);
+}
+
 #zoom-controls {
     position: absolute;
     bottom: 1.5rem;
@@ -127,7 +130,7 @@ $myMember = getUserMember($pdo, $user['id']);
 .zoom-btn {
     width: 38px;
     height: 38px;
-    background: rgba(17,17,39,0.92);
+    background: rgba(17,17,39,0.95);
     border: 1px solid #1e1e3a;
     border-radius: 8px;
     color: #aaa;
@@ -145,12 +148,11 @@ $myMember = getUserMember($pdo, $user['id']);
     color: #fff;
 }
 
-/* Legend */
 #tree-legend {
     position: absolute;
     bottom: 1.5rem;
     left: 1rem;
-    background: rgba(17,17,39,0.92);
+    background: rgba(17,17,39,0.95);
     border: 1px solid #1e1e3a;
     border-radius: 10px;
     padding: 0.85rem 1.1rem;
@@ -170,10 +172,10 @@ $myMember = getUserMember($pdo, $user['id']);
 
 .legend-row:last-child { margin-bottom: 0; }
 
-/* Detail panel */
 #detail-panel {
     position: absolute;
-    top: 0; right: -380px;
+    top: 0;
+    right: -380px;
     width: 360px;
     height: 100%;
     background: #111127;
@@ -189,11 +191,13 @@ $myMember = getUserMember($pdo, $user['id']);
 
 #panel-close {
     position: absolute;
-    top: 1rem; right: 1rem;
+    top: 1rem;
+    right: 1rem;
     background: #1e1e3a;
     border: none;
     color: #888;
-    width: 32px; height: 32px;
+    width: 32px;
+    height: 32px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 1rem;
@@ -207,27 +211,36 @@ $myMember = getUserMember($pdo, $user['id']);
     color: #fff;
 }
 
-/* Generation label */
-.gen-label {
-    fill: #1e1e3a;
-    font-size: 11px;
-    font-family: 'Segoe UI', sans-serif;
-}
-
-/* Empty state */
 #empty-state {
     position: absolute;
-    top: 50%; left: 50%;
+    top: 50%;
+    left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
     color: #555;
     display: none;
 }
+
+/* Pan hint */
+#pan-hint {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17,17,39,0.8);
+    border: 1px solid #1e1e3a;
+    color: #555;
+    font-size: 0.75rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 1s;
+}
 </style>
 
 <div id="tree-page">
 
-    <!-- Toolbar -->
     <div id="tree-toolbar">
         <div id="member-count">Loading...</div>
         <button class="toolbar-btn"
@@ -246,12 +259,10 @@ $myMember = getUserMember($pdo, $user['id']);
         </button>
     </div>
 
-    <!-- SVG -->
     <svg id="tree-svg">
         <g id="tree-g"></g>
     </svg>
 
-    <!-- Zoom controls -->
     <div id="zoom-controls">
         <button class="zoom-btn"
                 onclick="zoomIn()">+</button>
@@ -259,10 +270,10 @@ $myMember = getUserMember($pdo, $user['id']);
                 onclick="zoomOut()">−</button>
         <button class="zoom-btn"
                 onclick="resetView()"
-                style="font-size:0.9rem">↺</button>
+                title="Reset view"
+                style="font-size:0.85rem">↺</button>
     </div>
 
-    <!-- Legend -->
     <div id="tree-legend">
         <div style="color:#aaa;font-size:0.72rem;
                     font-weight:600;
@@ -276,32 +287,28 @@ $myMember = getUserMember($pdo, $user['id']);
                         border-radius:3px;
                         background:#0d1a3e;
                         border:2px solid #00d4ff">
-            </div>
-            You (root member)
+            </div>You (root)
         </div>
         <div class="legend-row">
             <div style="width:14px;height:14px;
                         border-radius:3px;
                         background:#0d1526;
                         border:2px solid #4a90d9">
-            </div>
-            Male member
+            </div>Male
         </div>
         <div class="legend-row">
             <div style="width:14px;height:14px;
                         border-radius:3px;
                         background:#1a0d1a;
                         border:2px solid #d94a8a">
-            </div>
-            Female member
+            </div>Female
         </div>
         <div class="legend-row">
             <div style="width:14px;height:14px;
                         border-radius:3px;
                         background:#111;
                         border:2px dashed #555">
-            </div>
-            Deceased
+            </div>Deceased
         </div>
         <div style="border-top:1px solid #1e1e3a;
                     margin:0.5rem 0"></div>
@@ -313,26 +320,19 @@ $myMember = getUserMember($pdo, $user['id']);
         <div class="legend-row">
             <div style="width:22px;height:2px;
                         background:repeating-linear-gradient(
-                          90deg,#d94a8a 0,
-                          #d94a8a 5px,
-                          transparent 5px,
-                          transparent 9px)">
-            </div>
-            Spouse
+                          90deg,#d94a8a 0,#d94a8a 5px,
+                          transparent 5px,transparent 9px)">
+            </div>Spouse
         </div>
         <div class="legend-row">
             <div style="width:22px;height:2px;
                         background:repeating-linear-gradient(
-                          90deg,#4ad9a0 0,
-                          #4ad9a0 3px,
-                          transparent 3px,
-                          transparent 7px)">
-            </div>
-            Sibling
+                          90deg,#4ad9a0 0,#4ad9a0 3px,
+                          transparent 3px,transparent 7px)">
+            </div>Sibling
         </div>
     </div>
 
-    <!-- Detail panel -->
     <div id="detail-panel">
         <button id="panel-close"
                 onclick="closePanel()">
@@ -341,35 +341,33 @@ $myMember = getUserMember($pdo, $user['id']);
         <div id="panel-content"></div>
     </div>
 
-    <!-- Empty state -->
+    <div id="pan-hint">
+        🖱 Drag to pan · Scroll to zoom
+    </div>
+
     <div id="empty-state">
         <i class="ti ti-git-fork"
-           style="font-size:3rem;
-                  display:block;
-                  margin-bottom:1rem;
-                  color:#1e1e3a"></i>
-        <h4 style="color:#555;
-                   margin-bottom:0.5rem">
+           style="font-size:3rem;display:block;
+                  margin-bottom:1rem;color:#1e1e3a">
+        </i>
+        <h4 style="color:#555;margin-bottom:0.5rem">
             No family members yet
         </h4>
-        <p style="font-size:0.9rem;
-                  margin-bottom:1rem">
-            Add relatives to build your tree
-        </p>
         <a href="<?= SITE_URL ?>/family/add.php"
            style="background:#00d4ff;color:#000;
                   padding:0.5rem 1.25rem;
                   border-radius:8px;
                   font-weight:600;
                   text-decoration:none;
-                  font-size:0.9rem">
+                  font-size:0.9rem;
+                  margin-top:0.5rem;
+                  display:inline-block">
             Add First Member
         </a>
     </div>
 
 </div>
 
-<!-- D3.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 
 <script>
@@ -377,35 +375,62 @@ const SITE_URL = '<?= SITE_URL ?>';
 const ROOT_ID  = <?= $myMember['member_id'] ?>;
 
 // Card dimensions
-const CW = 150; // card width
-const CH = 72;  // card height
-const GH = 180; // vertical gap between generations
-const GW = 180; // horizontal gap between siblings
+const CW = 155;  // card width
+const CH = 72;   // card height
+const GH = 160;  // vertical gap between generations
+const GW = 185;  // horizontal gap between nodes
 
-let svg, g, zoom, treeData;
+let svg, g, zoom;
+let allNodes = [];
+let allLinks = [];
+let visibleNodeIds = new Set();
+let positions = {};
+let levelMap  = {};
+let selectedId = null;
 
-// ── Load data ─────────────────────────────────
+// ── Load and render ───────────────────────────
 async function loadTree() {
     try {
-        const res  = await fetch(
+        const res = await fetch(
             SITE_URL + '/api/tree.php'
         );
-        treeData = await res.json();
+        const data = await res.json();
 
-        if (treeData.error
-            || !treeData.nodes
-            || treeData.nodes.length === 0) {
+        if (data.error
+            || !data.nodes
+            || data.nodes.length === 0) {
             showEmpty();
             return;
         }
 
+        allNodes = data.nodes;
+        allLinks = data.links;
+
         document.getElementById('member-count')
             .textContent =
-            treeData.counts.total + ' member' +
-            (treeData.counts.total !== 1
-                ? 's' : '');
+            data.counts.total + ' member' +
+            (data.counts.total !== 1 ? 's' : '');
 
-        buildHierarchy(treeData);
+        // Start with root + direct connections
+        visibleNodeIds = new Set([ROOT_ID]);
+        allLinks.forEach(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            if (src === ROOT_ID)
+                visibleNodeIds.add(tgt);
+            if (tgt === ROOT_ID)
+                visibleNodeIds.add(src);
+        });
+
+        initSVG();
+        buildAndRender();
+
+        // Hide pan hint after 4 seconds
+        setTimeout(() => {
+            const hint =
+                document.getElementById('pan-hint');
+            if (hint) hint.style.opacity = '0';
+        }, 4000);
 
     } catch(e) {
         console.error(e);
@@ -413,14 +438,42 @@ async function loadTree() {
     }
 }
 
-function buildHierarchy(data) {
-    const nodes = data.nodes;
-    const links = data.links;
+// ── Init SVG and zoom/pan ─────────────────────
+function initSVG() {
+    svg  = d3.select('#tree-svg');
+    g    = d3.select('#tree-g');
 
-    // levelMap: ROOT = 0
-    // Ancestors = negative numbers (going up)
-    // Descendants = positive numbers (going down)
-    const levelMap = {};
+    zoom = d3.zoom()
+        .scaleExtent([0.1, 3])
+        .on('zoom', ev => {
+            g.attr('transform', ev.transform);
+        });
+
+    // Enable pan and zoom on the SVG
+    svg.call(zoom)
+        .on('dblclick.zoom', null); // disable dbl-click zoom
+
+    // Click background to close panel
+    svg.on('click', () => {
+        closePanel();
+        clearSelected();
+    });
+}
+
+// ── Build levels and render ───────────────────
+function buildAndRender() {
+    const nodes = allNodes.filter(
+        n => visibleNodeIds.has(n.id)
+    );
+    const links = allLinks.filter(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        return visibleNodeIds.has(src)
+            && visibleNodeIds.has(tgt);
+    });
+
+    // Assign generation levels
+    levelMap = {};
     levelMap[ROOT_ID] = 0;
 
     const visited = new Set([ROOT_ID]);
@@ -431,27 +484,31 @@ function buildHierarchy(data) {
         const currentLevel = levelMap[current];
 
         links.forEach(l => {
-            const src   = l.source.id ?? l.source;
-            const tgt   = l.target.id ?? l.target;
-            const type  = l.type;
-            const label = l.label || '';
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            const type = l.type;
+            const lbl  = l.label || '';
 
-            // ── Rule 1 ────────────────────────
-            // current → someone with type=parent
-            // means: that someone IS the parent
-            // of current → goes ONE LEVEL UP
+            // current → tgt as parent
+            // tgt is ABOVE current
             if (src === current
                 && type === 'parent'
                 && !visited.has(tgt)) {
-                levelMap[tgt] = currentLevel - 1;
+
+                let offset = -1;
+                if (lbl.includes('grandfather')
+                 || lbl.includes('grandmother'))
+                    offset = -2;
+                else if (lbl.includes('great_'))
+                    offset = -3;
+
+                levelMap[tgt] = currentLevel + offset;
                 visited.add(tgt);
                 queue.push(tgt);
             }
 
-            // ── Rule 2 ────────────────────────
-            // current → someone with type=child
-            // means: that someone IS the child
-            // of current → goes ONE LEVEL DOWN
+            // current → tgt as child
+            // tgt is BELOW current
             if (src === current
                 && type === 'child'
                 && !visited.has(tgt)) {
@@ -460,11 +517,8 @@ function buildHierarchy(data) {
                 queue.push(tgt);
             }
 
-            // ── Rule 3 ────────────────────────
-            // someone → current with type=child
-            // means: current IS the parent
-            // of that someone
-            // → that someone goes ONE LEVEL DOWN
+            // tgt === current with type child
+            // src is BELOW current
             if (tgt === current
                 && type === 'child'
                 && !visited.has(src)) {
@@ -473,36 +527,36 @@ function buildHierarchy(data) {
                 queue.push(src);
             }
 
-            // ── Rule 4 ────────────────────────
-            // someone → current with type=parent
-            // means: current IS the child
-            // → that someone goes ONE LEVEL UP
+            // tgt === current with type parent
+            // src is ABOVE current
             if (tgt === current
                 && type === 'parent'
                 && !visited.has(src)) {
-                levelMap[src] = currentLevel - 1;
+
+                // Find the label from root to src
+                const rootToSrc = allLinks.find(x =>
+                    (x.source.id ?? x.source)
+                        === ROOT_ID
+                    && (x.target.id ?? x.target)
+                        === src
+                );
+                const srcLbl =
+                    rootToSrc?.label || '';
+                let offset = -1;
+                if (srcLbl.includes('grandfather')
+                 || srcLbl.includes('grandmother'))
+                    offset = -2;
+                else if (srcLbl.includes('great_'))
+                    offset = -3;
+
+                levelMap[src] = currentLevel + offset;
                 visited.add(src);
                 queue.push(src);
             }
 
-            // ── Spouse → same level ───────────
-            if (type === 'spouse') {
-                if (src === current
-                    && !visited.has(tgt)) {
-                    levelMap[tgt] = currentLevel;
-                    visited.add(tgt);
-                    queue.push(tgt);
-                }
-                if (tgt === current
-                    && !visited.has(src)) {
-                    levelMap[src] = currentLevel;
-                    visited.add(src);
-                    queue.push(src);
-                }
-            }
-
-            // ── Sibling → same level ──────────
-            if (type === 'sibling') {
+            // Spouse / sibling → same level
+            if ((type === 'spouse'
+                 || type === 'sibling')) {
                 if (src === current
                     && !visited.has(tgt)) {
                     levelMap[tgt] = currentLevel;
@@ -519,42 +573,13 @@ function buildHierarchy(data) {
         });
     }
 
-    // Any unvisited nodes → level 0
+    // Fallback for unvisited
     nodes.forEach(n => {
-        if (levelMap[n.id] === undefined) {
+        if (levelMap[n.id] === undefined)
             levelMap[n.id] = 0;
-        }
     });
 
-    // ── Extra rule for grandparents ───────────
-    // If a node at level -1 also has a parent
-    // relationship to another node, push that
-    // node to level -2
-    // This is already handled by BFS above
-    // but we need to handle grandfather specifically
-    // by checking the relation_label
-    nodes.forEach(n => {
-        const label = '';
-        // Find links FROM this node
-        links.forEach(l => {
-            const src   = l.source.id ?? l.source;
-            const tgt   = l.target.id ?? l.target;
-            const lbl   = l.label || '';
-
-            // If Brighton → 8 with label
-            // grandfather_paternal
-            // then 8 should be at level -2
-            if (src === ROOT_ID
-                && tgt === n.id
-                && (lbl.includes('grandfather')
-                    || lbl.includes('grandmother')
-                    || lbl.includes('great_'))) {
-                levelMap[n.id] = -2;
-            }
-        });
-    });
-
-    // Group nodes by level
+    // Group by level
     const levels = {};
     nodes.forEach(n => {
         const lv = levelMap[n.id] ?? 0;
@@ -566,15 +591,13 @@ function buildHierarchy(data) {
         .map(Number)
         .sort((a, b) => a - b);
 
-    // ── Assign X Y positions ──────────────────
-    const positions = {};
-
+    // Assign positions
+    positions = {};
     sortedLevels.forEach(lv => {
         const members = levels[lv];
         const totalW  = members.length * GW;
         const startX  = -totalW / 2 + GW / 2;
         const y       = lv * GH;
-
         members.forEach((n, i) => {
             positions[n.id] = {
                 x: startX + i * GW,
@@ -583,34 +606,16 @@ function buildHierarchy(data) {
         });
     });
 
-    renderHierarchy(
-        nodes, links, positions,
-        levelMap, sortedLevels
-    );
+    renderAll(nodes, links, sortedLevels, levels);
 }
 
-// ── Render ────────────────────────────────────
-function renderHierarchy(
-    nodes, links, positions,
-    levelMap, sortedLevels
+// ── Render nodes and links ────────────────────
+function renderAll(
+    nodes, links, sortedLevels, levels
 ) {
-    const container =
-        document.getElementById('tree-page');
-    const W = container.offsetWidth;
-    const H = container.offsetHeight;
+    // Clear previous render
+    g.selectAll('*').remove();
 
-    svg = d3.select('#tree-svg');
-    g   = d3.select('#tree-g');
-
-    zoom = d3.zoom()
-        .scaleExtent([0.15, 3])
-        .on('zoom', ev => {
-            g.attr('transform', ev.transform);
-        });
-
-    svg.call(zoom);
-
-    // ── Generation label lines ────────────────
     const genLabels = {
         '-4': 'Great Great Grandparents',
         '-3': 'Great Grandparents',
@@ -619,37 +624,36 @@ function renderHierarchy(
          '0': 'Your Generation',
          '1': 'Children',
          '2': 'Grandchildren',
+         '3': 'Great Grandchildren',
     };
 
+    // ── Generation row labels ─────────────────
     sortedLevels.forEach(lv => {
-        const y = lv * GH;
-        const label = genLabels[lv] || '';
+        const label = genLabels[lv];
         if (!label) return;
+        const y = lv * GH;
 
         g.append('line')
-            .attr('x1', -2000)
-            .attr('y1', y - CH/2 - 18)
-            .attr('x2',  2000)
-            .attr('y2', y - CH/2 - 18)
-            .attr('stroke', '#1a1a2e')
+            .attr('x1', -3000)
+            .attr('y1', y - CH/2 - 20)
+            .attr('x2',  3000)
+            .attr('y2', y - CH/2 - 20)
+            .attr('stroke', '#131325')
             .attr('stroke-width', 1);
 
         g.append('text')
-            .attr('x', -600)
-            .attr('y', y - CH/2 - 5)
+            .attr('x', -700)
+            .attr('y', y - CH/2 - 6)
             .attr('font-size', '10px')
             .attr('font-family',
                   'Segoe UI, sans-serif')
-            .attr('fill', '#2a2a4a')
-            .attr('font-weight', '600')
-            .attr('text-transform', 'uppercase')
-            .attr('letter-spacing', '0.08em')
+            .attr('fill', '#252545')
+            .attr('font-weight', '700')
+            .attr('letter-spacing', '0.1em')
             .text(label.toUpperCase());
     });
 
-    // ── Draw links first (behind nodes) ───────
-    // Only draw parent-child links as curved paths
-    // Spouse and sibling as straight lines
+    // ── Draw links ────────────────────────────
     links.forEach(l => {
         const src = l.source.id ?? l.source;
         const tgt = l.target.id ?? l.target;
@@ -657,54 +661,118 @@ function renderHierarchy(
         const p2  = positions[tgt];
         if (!p1 || !p2) return;
 
+        const lvSrc = levelMap[src] ?? 0;
+        const lvTgt = levelMap[tgt] ?? 0;
+
         if (l.type === 'parent') {
-            // Curved path from parent to child
-            const lv1 = levelMap[src];
-            const lv2 = levelMap[tgt];
-            if (lv1 < lv2) {
-                // src is ancestor, tgt is descendant
-                const mx = (p1.x + p2.x) / 2;
-                const my = (p1.y + p2.y) / 2;
-                g.append('path')
-                    .attr('class', 'link-parent')
-                    .attr('d', `
-                        M ${p1.x} ${p1.y + CH/2}
-                        C ${p1.x} ${my},
-                          ${p2.x} ${my},
-                          ${p2.x} ${p2.y - CH/2}
-                    `);
+            // Only draw if one is directly
+            // above the other
+            let ancestor, descendant,
+                pAnc, pDesc;
+
+            if (lvSrc < lvTgt) {
+                ancestor   = src;
+                descendant = tgt;
+                pAnc  = p1;
+                pDesc = p2;
+            } else if (lvTgt < lvSrc) {
+                ancestor   = tgt;
+                descendant = src;
+                pAnc  = p2;
+                pDesc = p1;
+            } else {
+                return; // same level, skip
             }
+
+            // Draw curved path
+            // from bottom of ancestor
+            // to top of descendant
+            const x1 = pAnc.x;
+            const y1 = pAnc.y + CH/2;
+            const x2 = pDesc.x;
+            const y2 = pDesc.y - CH/2;
+            const midY = (y1 + y2) / 2;
+
+            g.append('path')
+                .attr('class', 'link-parent')
+                .attr('d', `
+                    M ${x1} ${y1}
+                    C ${x1} ${midY},
+                      ${x2} ${midY},
+                      ${x2} ${y2}
+                `);
+
         } else if (l.type === 'spouse') {
-            g.append('line')
-                .attr('class', 'link-spouse')
-                .attr('x1', p1.x + CW/2)
-                .attr('y1', p1.y)
-                .attr('x2', p2.x - CW/2)
-                .attr('y2', p2.y);
-        } else if (l.type === 'sibling') {
-            // Only draw once
+            // Horizontal line between spouses
+            // only draw once (src < tgt)
             if (src < tgt) {
+                const leftX  =
+                    Math.min(p1.x, p2.x) + CW/2;
+                const rightX =
+                    Math.max(p1.x, p2.x) - CW/2;
+                const midY =
+                    (p1.y + p2.y) / 2;
+
+                g.append('line')
+                    .attr('class', 'link-spouse')
+                    .attr('x1', leftX)
+                    .attr('y1', midY)
+                    .attr('x2', rightX)
+                    .attr('y2', midY);
+            }
+
+        } else if (l.type === 'sibling') {
+            // Arc between siblings
+            // only draw once
+            if (src < tgt) {
+                const leftX  =
+                    Math.min(p1.x, p2.x) + CW/2;
+                const rightX =
+                    Math.max(p1.x, p2.x) - CW/2;
+                const midY = p1.y;
+
                 g.append('line')
                     .attr('class', 'link-sibling')
-                    .attr('x1', p1.x + CW/2)
-                    .attr('y1', p1.y)
-                    .attr('x2', p2.x - CW/2)
-                    .attr('y2', p2.y);
+                    .attr('x1', leftX)
+                    .attr('y1', midY)
+                    .attr('x2', rightX)
+                    .attr('y2', midY);
             }
         }
     });
 
     // ── Draw nodes ────────────────────────────
     nodes.forEach(n => {
-        const pos = positions[n.id];
+        const pos    = positions[n.id];
         if (!pos) return;
 
         const isRoot = n.id === ROOT_ID;
+        const isSelected = n.id === selectedId;
+
+        const accentColor =
+            isRoot         ? '#00d4ff' :
+            n.is_deceased  ? '#555'    :
+            n.gender === 'female' ? '#d94a8a' :
+            '#4a90d9';
+
+        const fillColor =
+            isRoot         ? '#0d1a3e' :
+            n.is_deceased  ? '#0f0f0f' :
+            n.gender === 'female' ? '#1a0d1a' :
+            '#0d1526';
+
         const ng = g.append('g')
-            .attr('class', 'node-card')
+            .attr('class',
+                'node-card'
+                + (isSelected ? ' selected' : ''))
+            .attr('data-id', n.id)
             .attr('transform',
                 `translate(${pos.x},${pos.y})`)
-            .on('click', () => showDetail(n));
+            .style('cursor', 'pointer')
+            .on('click', (event) => {
+                event.stopPropagation();
+                onNodeClick(n);
+            });
 
         // Card background
         ng.append('rect')
@@ -715,53 +783,34 @@ function renderHierarchy(
             .attr('height', CH)
             .attr('rx', 10)
             .attr('ry', 10)
-            .attr('fill', () => {
-                if (isRoot)
-                    return '#0d1a3e';
-                if (n.is_deceased)
-                    return '#0f0f0f';
-                if (n.gender === 'female')
-                    return '#1a0d1a';
-                return '#0d1526';
-            })
-            .attr('stroke', () => {
-                if (isRoot)
-                    return '#00d4ff';
-                if (n.is_deceased)
-                    return '#444';
-                if (n.gender === 'female')
-                    return '#d94a8a';
-                return '#4a90d9';
-            })
+            .attr('fill', isSelected
+                ? d3.color(fillColor).brighter(0.5)
+                : fillColor)
+            .attr('stroke', isSelected
+                ? '#fff'
+                : accentColor)
             .attr('stroke-width',
-                isRoot ? 2.5 : 1.5)
+                isRoot ? 2.5 :
+                isSelected ? 2.5 : 1.5)
             .attr('stroke-dasharray',
                 n.is_deceased ? '5,3' : 'none');
 
         // Avatar circle
-        const avatarColor = isRoot
-            ? '#00d4ff'
-            : n.is_deceased
-                ? '#444'
-                : n.gender === 'female'
-                    ? '#d94a8a'
-                    : '#4a90d9';
-
         ng.append('circle')
             .attr('cx', -CW/2 + 24)
             .attr('cy', 0)
             .attr('r',  16)
-            .attr('fill', () => {
-                if (isRoot) return '#1a2a5e';
-                if (n.is_deceased) return '#1a1a1a';
-                if (n.gender === 'female')
-                    return '#2e0d2e';
-                return '#0d1e3a';
-            })
-            .attr('stroke', avatarColor)
+            .attr('fill', isRoot
+                ? '#1a2a5e'
+                : n.is_deceased
+                    ? '#1a1a1a'
+                    : n.gender === 'female'
+                        ? '#2e0d2e'
+                        : '#0d1e3a')
+            .attr('stroke', accentColor)
             .attr('stroke-width', 1.5);
 
-        // Initial
+        // Initial letter
         ng.append('text')
             .attr('x', -CW/2 + 24)
             .attr('y', 5)
@@ -770,31 +819,30 @@ function renderHierarchy(
             .attr('font-weight', '700')
             .attr('font-family',
                   'Segoe UI, sans-serif')
-            .attr('fill', avatarColor)
+            .attr('fill', accentColor)
             .text(n.name.charAt(0).toUpperCase());
 
         // Name
-        const displayName =
-            n.preferred_name || n.name;
-        const truncName = displayName.length > 12
-            ? displayName.substring(0, 11) + '…'
-            : displayName;
+        const dName = n.preferred_name || n.name;
+        const tName = dName.length > 11
+            ? dName.substring(0, 10) + '…'
+            : dName;
 
         ng.append('text')
             .attr('x', -CW/2 + 47)
-            .attr('y', n.date_range ? -10 : 5)
+            .attr('y', n.date_range ? -10 : 2)
             .attr('font-size', '12px')
             .attr('font-weight', '600')
             .attr('font-family',
                   'Segoe UI, sans-serif')
             .attr('fill', isRoot ? '#fff' : '#ddd')
-            .text(truncName);
+            .text(tName);
 
         // Date range
         if (n.date_range) {
             ng.append('text')
                 .attr('x', -CW/2 + 47)
-                .attr('y', 5)
+                .attr('y', 4)
                 .attr('font-size', '9px')
                 .attr('font-family',
                       'Segoe UI, sans-serif')
@@ -803,18 +851,21 @@ function renderHierarchy(
         }
 
         // Quarter
-        ng.append('text')
-            .attr('x', -CW/2 + 47)
-            .attr('y', n.date_range ? 19 : 18)
-            .attr('font-size', '8.5px')
-            .attr('font-family',
-                  'Segoe UI, sans-serif')
-            .attr('fill',
-                n.quarter_id ? '#00d4ff' : '#666')
-            .attr('opacity', 0.8)
-            .text(n.quarter
-                ? n.quarter.substring(0, 14)
-                : '');
+        if (n.quarter) {
+            ng.append('text')
+                .attr('x', -CW/2 + 47)
+                .attr('y', n.date_range ? 18 : 17)
+                .attr('font-size', '8.5px')
+                .attr('font-family',
+                      'Segoe UI, sans-serif')
+                .attr('fill',
+                    n.quarter_id
+                    ? '#00d4ff' : '#777')
+                .attr('opacity', 0.85)
+                .text(n.quarter.length > 13
+                    ? n.quarter.substring(0,12) + '…'
+                    : n.quarter);
+        }
 
         // YOU badge
         if (isRoot) {
@@ -841,14 +892,14 @@ function renderHierarchy(
         // Verified badge
         if (n.verified && !isRoot) {
             ng.append('circle')
-                .attr('cx', CW/2 - 8)
-                .attr('cy', -CH/2 + 8)
+                .attr('cx', CW/2 - 9)
+                .attr('cy', -CH/2 + 9)
                 .attr('r',  7)
                 .attr('fill', '#00d4ff');
 
             ng.append('text')
-                .attr('x', CW/2 - 8)
-                .attr('y', -CH/2 + 12)
+                .attr('x', CW/2 - 9)
+                .attr('y', -CH/2 + 13)
                 .attr('text-anchor', 'middle')
                 .attr('font-size', '8px')
                 .attr('font-weight', '700')
@@ -859,47 +910,145 @@ function renderHierarchy(
         // Deceased cross
         if (n.is_deceased) {
             ng.append('text')
-                .attr('x',  CW/2 - 8)
+                .attr('x',  CW/2 - 9)
                 .attr('y',  CH/2 - 4)
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '10px')
+                .attr('font-size', '11px')
                 .attr('fill', '#555')
                 .text('†');
         }
+
+        // Expand indicator
+        // Show + if this node has connections
+        // not yet visible
+        const hasHidden = allLinks.some(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            return (src === n.id
+                    && !visibleNodeIds.has(tgt))
+                || (tgt === n.id
+                    && !visibleNodeIds.has(src));
+        });
+
+        if (hasHidden) {
+            ng.append('circle')
+                .attr('cx', 0)
+                .attr('cy', CH/2)
+                .attr('r',  8)
+                .attr('fill', '#1e1e3a')
+                .attr('stroke', '#00d4ff')
+                .attr('stroke-width', 1.5);
+
+            ng.append('text')
+                .attr('x', 0)
+                .attr('y', CH/2 + 4)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '11px')
+                .attr('font-weight', '700')
+                .attr('font-family',
+                      'Segoe UI, sans-serif')
+                .attr('fill', '#00d4ff')
+                .text('+');
+        }
     });
 
-    // ── Click background to close panel ───────
-    svg.on('click', () => closePanel());
+    // Animate in
+    g.selectAll('.node-card')
+        .style('opacity', 0)
+        .transition()
+        .duration(400)
+        .style('opacity', 1);
+}
 
-    // ── Initial center view ───────────────────
-    setTimeout(() => resetView(), 100);
+// ── Node click handler ────────────────────────
+function onNodeClick(n) {
+    selectedId = n.id;
+
+    // Expand: add all connections
+    // of this node to visible set
+    let added = false;
+    allLinks.forEach(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        if (src === n.id
+            && !visibleNodeIds.has(tgt)) {
+            visibleNodeIds.add(tgt);
+            added = true;
+        }
+        if (tgt === n.id
+            && !visibleNodeIds.has(src)) {
+            visibleNodeIds.add(src);
+            added = true;
+        }
+    });
+
+    // Re-render with expanded nodes
+    buildAndRender();
+
+    // Show detail panel
+    showDetail(n);
 }
 
 // ── Detail panel ──────────────────────────────
 function showDetail(n) {
     const isRoot = n.id === ROOT_ID;
-    const gc = n.gender === 'female'
-        ? '#d94a8a'
-        : isRoot ? '#00d4ff' : '#4a90d9';
+    const gc =
+        isRoot ? '#00d4ff' :
+        n.gender === 'female' ? '#d94a8a' :
+        '#4a90d9';
+
+    // Find this node's connections
+    // from allLinks
+    const connections = [];
+    allLinks.forEach(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        let otherId = null;
+
+        if (src === n.id) otherId = tgt;
+        else if (tgt === n.id) otherId = src;
+
+        if (otherId !== null) {
+            const other = allNodes.find(
+                x => x.id === otherId
+            );
+            if (other) {
+                connections.push({
+                    member: other,
+                    type:   l.type,
+                    label:  l.label,
+                    isSrc:  src === n.id,
+                });
+            }
+        }
+    });
+
+    // Remove duplicate connections
+    const seen = new Set();
+    const uniqueConn = connections.filter(c => {
+        const key = c.member.id + '_' + c.type;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 
     document.getElementById('panel-content')
         .innerHTML = `
 
         <div style="text-align:center;
-                    margin-bottom:1.5rem">
+                    margin-bottom:1.25rem">
             <div style="
-                width:60px;height:60px;
+                width:58px;height:58px;
                 border-radius:50%;
                 background:${
                     n.gender === 'female'
-                    ? '#2e0d2e' : '#0d1e3a'
-                };
+                    ? '#2e0d2e' : '#0d1e3a'};
                 border:2px solid ${gc};
                 ${n.is_deceased
                     ? 'border-style:dashed;' : ''}
                 display:flex;align-items:center;
                 justify-content:center;
-                font-size:1.4rem;font-weight:700;
+                font-size:1.3rem;font-weight:700;
                 color:${gc};
                 margin:0 auto 0.75rem;
             ">
@@ -912,7 +1061,7 @@ function showDetail(n) {
             </h4>
             ${n.preferred_name ? `
             <div style="color:#888;
-                        font-size:0.82rem;
+                        font-size:0.8rem;
                         margin-bottom:5px">
                 "${esc(n.preferred_name)}"
             </div>` : ''}
@@ -935,10 +1084,13 @@ function showDetail(n) {
             <div style="color:#00d4ff;
                         font-size:0.75rem;
                         margin-top:3px">
-                ✓ Verified record
+                ✓ Verified
             </div>` : ''}
         </div>
 
+        <!-- Vital stats -->
+        ${(n.date_range || n.birthplace
+           || n.occupation) ? `
         <div style="
             background:#0d0d1a;
             border:1px solid #1e1e3a;
@@ -950,8 +1102,7 @@ function showDetail(n) {
             <div style="display:flex;gap:8px;
                         margin-bottom:0.5rem">
                 <span style="color:#555;
-                             font-size:0.82rem">
-                    📅
+                             font-size:0.8rem">📅
                 </span>
                 <span style="color:#aaa;
                              font-size:0.82rem">
@@ -962,8 +1113,7 @@ function showDetail(n) {
             <div style="display:flex;gap:8px;
                         margin-bottom:0.5rem">
                 <span style="color:#555;
-                             font-size:0.82rem">
-                    📍
+                             font-size:0.8rem">📍
                 </span>
                 <span style="color:#aaa;
                              font-size:0.82rem">
@@ -973,24 +1123,16 @@ function showDetail(n) {
             ${n.occupation ? `
             <div style="display:flex;gap:8px">
                 <span style="color:#555;
-                             font-size:0.82rem">
-                    💼
+                             font-size:0.8rem">💼
                 </span>
                 <span style="color:#aaa;
                              font-size:0.82rem">
                     ${esc(n.occupation)}
                 </span>
             </div>` : ''}
-            ${!n.date_range
-              && !n.birthplace
-              && !n.occupation ? `
-            <div style="color:#555;
-                        font-size:0.82rem;
-                        font-style:italic">
-                No additional details recorded
-            </div>` : ''}
-        </div>
+        </div>` : ''}
 
+        <!-- Bio -->
         ${n.bio ? `
         <div style="
             color:#888;font-size:0.82rem;
@@ -1002,15 +1144,65 @@ function showDetail(n) {
             ${esc(n.bio)}
         </div>` : ''}
 
+        <!-- Connections -->
+        ${uniqueConn.length ? `
+        <div style="margin-bottom:1rem">
+            <div style="
+                font-size:0.72rem;font-weight:600;
+                text-transform:uppercase;
+                letter-spacing:0.06em;
+                color:#555;margin-bottom:0.6rem;
+            ">
+                Connections
+            </div>
+            ${uniqueConn.map(c => `
+            <div style="
+                display:flex;align-items:center;
+                gap:0.6rem;padding:0.5rem 0;
+                border-bottom:1px solid #1a1a2e;
+                cursor:pointer;
+            "
+            onclick="onNodeClick(
+                allNodes.find(x => x.id === ${c.member.id})
+            )">
+                <div style="
+                    width:30px;height:30px;
+                    border-radius:50%;
+                    background:#1e1e3a;
+                    display:flex;align-items:center;
+                    justify-content:center;
+                    font-size:0.85rem;font-weight:700;
+                    color:#00d4ff;flex-shrink:0;
+                ">
+                    ${c.member.name.charAt(0)
+                        .toUpperCase()}
+                </div>
+                <div style="flex:1;min-width:0">
+                    <div style="color:#ddd;
+                                font-size:0.85rem;
+                                white-space:nowrap;
+                                overflow:hidden;
+                                text-overflow:ellipsis">
+                        ${esc(c.member.name)}
+                    </div>
+                    <div style="color:#00d4ff;
+                                font-size:0.75rem">
+                        ${esc(c.type)}
+                    </div>
+                </div>
+                <div style="color:#333;
+                            font-size:0.8rem">›</div>
+            </div>`).join('')}
+        </div>` : ''}
+
+        <!-- Actions -->
         <div style="
-            display:flex;
-            flex-direction:column;
-            gap:0.5rem;
-            margin-top:1rem;
+            display:flex;flex-direction:column;
+            gap:0.5rem;margin-top:0.5rem;
         ">
             ${!isRoot ? `
-            <button onclick="openChat(
-                ${n.id}, '${esc(n.name)}')"
+            <button onclick="alert(
+                'Messaging coming soon')"
                 style="
                     background:#00d4ff;
                     border:none;color:#000;
@@ -1018,19 +1210,16 @@ function showDetail(n) {
                     border-radius:8px;
                     font-size:0.85rem;
                     font-weight:600;
-                    cursor:pointer;
-                    width:100%;
+                    cursor:pointer;width:100%;
                 ">
                 💬 Send Message
             </button>` : `
             <div style="
                 background:rgba(0,212,255,0.06);
                 border:1px solid rgba(0,212,255,0.15);
-                border-radius:8px;
-                padding:0.65rem;
+                border-radius:8px;padding:0.65rem;
                 text-align:center;
-                color:#00d4ff;
-                font-size:0.82rem;
+                color:#00d4ff;font-size:0.82rem;
             ">
                 This is your profile node
             </div>`}
@@ -1059,13 +1248,12 @@ function closePanel() {
         .classList.remove('open');
 }
 
-// ── Chat ──────────────────────────────────────
-function openChat(userId, userName) {
-    alert('Messaging coming soon.\nYou selected: '
-          + userName);
+function clearSelected() {
+    selectedId = null;
+    buildAndRender();
 }
 
-// ── Zoom ──────────────────────────────────────
+// ── Zoom controls ─────────────────────────────
 function zoomIn() {
     svg.transition().duration(250)
         .call(zoom.scaleBy, 1.4);
@@ -1090,9 +1278,8 @@ function resetView() {
 }
 
 function toggleLegend() {
-    const l = document.getElementById(
-        'tree-legend'
-    );
+    const l =
+        document.getElementById('tree-legend');
     l.style.display =
         l.style.display === 'block'
         ? 'none' : 'block';
@@ -1108,11 +1295,11 @@ function showEmpty() {
 function esc(str) {
     if (!str) return '';
     return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/&/g,  '&amp;')
+        .replace(/</g,  '&lt;')
+        .replace(/>/g,  '&gt;')
+        .replace(/"/g,  '&quot;')
+        .replace(/'/g,  '&#39;');
 }
 
 loadTree();
