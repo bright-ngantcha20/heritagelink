@@ -6,7 +6,7 @@ require_once '../includes/functions.php';
 
 requireLogin();
 
-$user     = currentUser();
+$user       = currentUser();
 $hasProfile = hasProfile($pdo, $user['id']);
 
 if (!$hasProfile) {
@@ -17,114 +17,19 @@ $myMember = getUserMember($pdo, $user['id']);
 ?>
 <?php require_once '../includes/header.php'; ?>
 
-<!-- Tree specific styles -->
 <style>
-#tree-container {
+* { box-sizing: border-box; }
+
+#tree-page {
     width: 100%;
     height: calc(100vh - 70px);
     background: #0a0a18;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-#tree-svg {
-    width: 100%;
-    height: 100%;
-    cursor: grab;
-}
-
-#tree-svg:active {
-    cursor: grabbing;
-}
-
-/* Node circles */
-.node-circle {
-    stroke-width: 3;
-    transition: all 0.2s;
-    cursor: pointer;
-}
-
-.node-circle:hover {
-    filter: brightness(1.3);
-}
-
-.node-circle.root {
-    stroke: #00d4ff;
-    fill: #1a1a3e;
-}
-
-.node-circle.male {
-    stroke: #4a90d9;
-    fill: #0d1a2e;
-}
-
-.node-circle.female {
-    stroke: #d94a8a;
-    fill: #2e0d1a;
-}
-
-.node-circle.deceased {
-    stroke: #555;
-    fill: #1a1a1a;
-    stroke-dasharray: 5,3;
-}
-
-.node-circle.verified {
-    filter: drop-shadow(0 0 6px rgba(0,212,255,0.4));
-}
-
-/* Node labels */
-.node-name {
-    fill: #e0e0e0;
-    font-size: 12px;
-    font-family: 'Segoe UI', sans-serif;
-    font-weight: 500;
-    text-anchor: middle;
-    pointer-events: none;
-}
-
-.node-date {
-    fill: #666;
-    font-size: 10px;
-    font-family: 'Segoe UI', sans-serif;
-    text-anchor: middle;
-    pointer-events: none;
-}
-
-.node-quarter {
-    fill: #00d4ff;
-    font-size: 9px;
-    font-family: 'Segoe UI', sans-serif;
-    text-anchor: middle;
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-/* Links */
-.link-parent {
-    stroke: #4a90d9;
-    stroke-width: 1.5;
-    fill: none;
-    opacity: 0.5;
-}
-
-.link-spouse {
-    stroke: #d94a8a;
-    stroke-width: 1.5;
-    fill: none;
-    stroke-dasharray: 4,2;
-    opacity: 0.5;
-}
-
-.link-sibling {
-    stroke: #4ad9a0;
-    stroke-width: 1.5;
-    fill: none;
-    stroke-dasharray: 2,3;
-    opacity: 0.4;
-}
-
-/* Toolbar */
 #tree-toolbar {
     position: absolute;
     top: 1rem;
@@ -137,10 +42,10 @@ $myMember = getUserMember($pdo, $user['id']);
 }
 
 .toolbar-btn {
-    background: rgba(17,17,39,0.9);
+    background: rgba(17,17,39,0.92);
     border: 1px solid #1e1e3a;
     color: #aaa;
-    padding: 0.4rem 0.85rem;
+    padding: 0.45rem 1rem;
     border-radius: 8px;
     font-size: 0.82rem;
     cursor: pointer;
@@ -149,6 +54,7 @@ $myMember = getUserMember($pdo, $user['id']);
     display: flex;
     align-items: center;
     gap: 5px;
+    text-decoration: none;
 }
 
 .toolbar-btn:hover {
@@ -156,22 +62,62 @@ $myMember = getUserMember($pdo, $user['id']);
     color: #fff;
 }
 
-/* Member count badge */
 #member-count {
-    background: rgba(0,212,255,0.1);
-    border: 1px solid rgba(0,212,255,0.2);
+    background: rgba(0,212,255,0.12);
+    border: 1px solid rgba(0,212,255,0.25);
     color: #00d4ff;
-    padding: 0.4rem 0.85rem;
+    padding: 0.45rem 1rem;
     border-radius: 8px;
     font-size: 0.82rem;
-    backdrop-filter: blur(8px);
+}
+
+#tree-svg {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+#tree-svg:active { cursor: grabbing; }
+
+/* Node card */
+.node-card {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.node-card:hover .card-bg {
+    filter: brightness(1.25);
+}
+
+/* Links */
+.link-parent {
+    stroke: #4a90d9;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0.6;
+}
+
+.link-spouse {
+    stroke: #d94a8a;
+    stroke-width: 1.5;
+    fill: none;
+    stroke-dasharray: 6,3;
+    opacity: 0.5;
+}
+
+.link-sibling {
+    stroke: #4ad9a0;
+    stroke-width: 1.5;
+    fill: none;
+    stroke-dasharray: 3,4;
+    opacity: 0.4;
 }
 
 /* Zoom controls */
 #zoom-controls {
     position: absolute;
-    bottom: 2rem;
-    right: 1rem;
+    bottom: 1.5rem;
+    right: 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -179,9 +125,9 @@ $myMember = getUserMember($pdo, $user['id']);
 }
 
 .zoom-btn {
-    width: 36px;
-    height: 36px;
-    background: rgba(17,17,39,0.9);
+    width: 38px;
+    height: 38px;
+    background: rgba(17,17,39,0.92);
     border: 1px solid #1e1e3a;
     border-radius: 8px;
     color: #aaa;
@@ -191,6 +137,7 @@ $myMember = getUserMember($pdo, $user['id']);
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
+    backdrop-filter: blur(8px);
 }
 
 .zoom-btn:hover {
@@ -201,47 +148,32 @@ $myMember = getUserMember($pdo, $user['id']);
 /* Legend */
 #tree-legend {
     position: absolute;
-    bottom: 2rem;
+    bottom: 1.5rem;
     left: 1rem;
-    background: rgba(17,17,39,0.9);
+    background: rgba(17,17,39,0.92);
     border: 1px solid #1e1e3a;
     border-radius: 10px;
-    padding: 0.75rem 1rem;
+    padding: 0.85rem 1.1rem;
     backdrop-filter: blur(8px);
     z-index: 100;
+    display: none;
 }
 
-.legend-item {
+.legend-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 5px;
     font-size: 0.78rem;
     color: #888;
+    margin-bottom: 5px;
 }
 
-.legend-item:last-child {
-    margin-bottom: 0;
-}
+.legend-row:last-child { margin-bottom: 0; }
 
-.legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.legend-line {
-    width: 20px;
-    height: 2px;
-    flex-shrink: 0;
-}
-
-/* Member detail panel */
+/* Detail panel */
 #detail-panel {
     position: absolute;
-    top: 0;
-    right: -380px;
+    top: 0; right: -380px;
     width: 360px;
     height: 100%;
     background: #111127;
@@ -249,67 +181,43 @@ $myMember = getUserMember($pdo, $user['id']);
     z-index: 200;
     transition: right 0.3s ease;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-
-#detail-panel.open {
-    right: 0;
-}
-
-#detail-panel-inner {
     padding: 1.5rem;
-    flex: 1;
+    padding-top: 3rem;
 }
 
-.detail-close {
+#detail-panel.open { right: 0; }
+
+#panel-close {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 1rem; right: 1rem;
     background: #1e1e3a;
     border: none;
     color: #888;
-    width: 32px;
-    height: 32px;
+    width: 32px; height: 32px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 1rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
 }
 
-.detail-close:hover {
+#panel-close:hover {
     background: #2a2a4a;
     color: #fff;
 }
 
-/* Chat panel */
-#chat-panel {
-    position: absolute;
-    bottom: 0;
-    right: -380px;
-    width: 360px;
-    height: 480px;
-    background: #111127;
-    border: 1px solid #1e1e3a;
-    border-radius: 16px 16px 0 0;
-    z-index: 300;
-    transition: right 0.3s ease;
-    display: flex;
-    flex-direction: column;
-}
-
-#chat-panel.open {
-    right: 0;
+/* Generation label */
+.gen-label {
+    fill: #1e1e3a;
+    font-size: 11px;
+    font-family: 'Segoe UI', sans-serif;
 }
 
 /* Empty state */
 #empty-state {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
     color: #555;
@@ -317,46 +225,121 @@ $myMember = getUserMember($pdo, $user['id']);
 }
 </style>
 
-<div id="tree-container">
+<div id="tree-page">
 
     <!-- Toolbar -->
     <div id="tree-toolbar">
-        <div id="member-count">
-            Loading tree...
-        </div>
+        <div id="member-count">Loading...</div>
         <button class="toolbar-btn"
                 onclick="resetView()">
             <i class="ti ti-home"></i> Reset
         </button>
-        <button class="toolbar-btn"
-                onclick="window.location.href=
-                '<?= SITE_URL ?>/family/add.php'">
+        <a href="<?= SITE_URL ?>/family/add.php"
+           class="toolbar-btn">
             <i class="ti ti-user-plus"></i>
             Add Member
-        </button>
+        </a>
         <button class="toolbar-btn"
-                id="toggle-legend-btn"
                 onclick="toggleLegend()">
             <i class="ti ti-info-circle"></i>
             Legend
         </button>
     </div>
 
-    <!-- SVG canvas -->
+    <!-- SVG -->
     <svg id="tree-svg">
-        <defs>
-            <marker id="arrow"
-                    markerWidth="6"
-                    markerHeight="6"
-                    refX="5" refY="3"
-                    orient="auto">
-                <path d="M0,0 L0,6 L6,3 z"
-                      fill="#4a90d9"
-                      opacity="0.5"/>
-            </marker>
-        </defs>
         <g id="tree-g"></g>
     </svg>
+
+    <!-- Zoom controls -->
+    <div id="zoom-controls">
+        <button class="zoom-btn"
+                onclick="zoomIn()">+</button>
+        <button class="zoom-btn"
+                onclick="zoomOut()">−</button>
+        <button class="zoom-btn"
+                onclick="resetView()"
+                style="font-size:0.9rem">↺</button>
+    </div>
+
+    <!-- Legend -->
+    <div id="tree-legend">
+        <div style="color:#aaa;font-size:0.72rem;
+                    font-weight:600;
+                    text-transform:uppercase;
+                    letter-spacing:0.06em;
+                    margin-bottom:0.6rem">
+            Legend
+        </div>
+        <div class="legend-row">
+            <div style="width:14px;height:14px;
+                        border-radius:3px;
+                        background:#0d1a3e;
+                        border:2px solid #00d4ff">
+            </div>
+            You (root member)
+        </div>
+        <div class="legend-row">
+            <div style="width:14px;height:14px;
+                        border-radius:3px;
+                        background:#0d1526;
+                        border:2px solid #4a90d9">
+            </div>
+            Male member
+        </div>
+        <div class="legend-row">
+            <div style="width:14px;height:14px;
+                        border-radius:3px;
+                        background:#1a0d1a;
+                        border:2px solid #d94a8a">
+            </div>
+            Female member
+        </div>
+        <div class="legend-row">
+            <div style="width:14px;height:14px;
+                        border-radius:3px;
+                        background:#111;
+                        border:2px dashed #555">
+            </div>
+            Deceased
+        </div>
+        <div style="border-top:1px solid #1e1e3a;
+                    margin:0.5rem 0"></div>
+        <div class="legend-row">
+            <div style="width:22px;height:2px;
+                        background:#4a90d9"></div>
+            Parent / Child
+        </div>
+        <div class="legend-row">
+            <div style="width:22px;height:2px;
+                        background:repeating-linear-gradient(
+                          90deg,#d94a8a 0,
+                          #d94a8a 5px,
+                          transparent 5px,
+                          transparent 9px)">
+            </div>
+            Spouse
+        </div>
+        <div class="legend-row">
+            <div style="width:22px;height:2px;
+                        background:repeating-linear-gradient(
+                          90deg,#4ad9a0 0,
+                          #4ad9a0 3px,
+                          transparent 3px,
+                          transparent 7px)">
+            </div>
+            Sibling
+        </div>
+    </div>
+
+    <!-- Detail panel -->
+    <div id="detail-panel">
+        <button id="panel-close"
+                onclick="closePanel()">
+            <i class="ti ti-x"></i>
+        </button>
+        <div id="panel-content"></div>
+    </div>
 
     <!-- Empty state -->
     <div id="empty-state">
@@ -365,188 +348,23 @@ $myMember = getUserMember($pdo, $user['id']);
                   display:block;
                   margin-bottom:1rem;
                   color:#1e1e3a"></i>
-        <h4 style="color:#666;margin-bottom:0.5rem">
-            No connections yet
+        <h4 style="color:#555;
+                   margin-bottom:0.5rem">
+            No family members yet
         </h4>
-        <p style="font-size:0.9rem;margin-bottom:1rem">
-            Add family members to build your tree
+        <p style="font-size:0.9rem;
+                  margin-bottom:1rem">
+            Add relatives to build your tree
         </p>
         <a href="<?= SITE_URL ?>/family/add.php"
-           style="
-             background:#00d4ff;color:#000;
-             padding:0.5rem 1.25rem;
-             border-radius:8px;font-size:0.9rem;
-             font-weight:600;text-decoration:none;
-           ">
+           style="background:#00d4ff;color:#000;
+                  padding:0.5rem 1.25rem;
+                  border-radius:8px;
+                  font-weight:600;
+                  text-decoration:none;
+                  font-size:0.9rem">
             Add First Member
         </a>
-    </div>
-
-    <!-- Zoom controls -->
-    <div id="zoom-controls">
-        <button class="zoom-btn"
-                onclick="zoomIn()"
-                title="Zoom in">+</button>
-        <button class="zoom-btn"
-                onclick="zoomOut()"
-                title="Zoom out">−</button>
-        <button class="zoom-btn"
-                onclick="resetView()"
-                title="Reset view"
-                style="font-size:0.75rem">
-            ↺
-        </button>
-    </div>
-
-    <!-- Legend -->
-    <div id="tree-legend">
-        <div style="color:#aaa;font-size:0.75rem;
-                    font-weight:600;
-                    text-transform:uppercase;
-                    letter-spacing:0.05em;
-                    margin-bottom:0.6rem">
-            Legend
-        </div>
-        <div class="legend-item">
-            <div class="legend-dot"
-                 style="background:#00d4ff;
-                        border:2px solid #00d4ff">
-            </div>
-            You (root)
-        </div>
-        <div class="legend-item">
-            <div class="legend-dot"
-                 style="background:#0d1a2e;
-                        border:2px solid #4a90d9">
-            </div>
-            Male member
-        </div>
-        <div class="legend-item">
-            <div class="legend-dot"
-                 style="background:#2e0d1a;
-                        border:2px solid #d94a8a">
-            </div>
-            Female member
-        </div>
-        <div class="legend-item">
-            <div class="legend-dot"
-                 style="background:#1a1a1a;
-                        border:2px dashed #555">
-            </div>
-            Deceased
-        </div>
-        <div style="
-            border-top:1px solid #1e1e3a;
-            margin:0.5rem 0;
-        "></div>
-        <div class="legend-item">
-            <div class="legend-line"
-                 style="background:#4a90d9">
-            </div>
-            Parent / Child
-        </div>
-        <div class="legend-item">
-            <div class="legend-line"
-                 style="background:#d94a8a;
-                        background: repeating-linear-gradient(
-                          90deg,#d94a8a 0,
-                          #d94a8a 4px,
-                          transparent 4px,
-                          transparent 8px
-                        )">
-            </div>
-            Spouse
-        </div>
-        <div class="legend-item">
-            <div class="legend-line"
-                 style="background: repeating-linear-gradient(
-                          90deg,#4ad9a0 0,
-                          #4ad9a0 2px,
-                          transparent 2px,
-                          transparent 5px
-                        )">
-            </div>
-            Sibling
-        </div>
-    </div>
-
-    <!-- Member detail panel -->
-    <div id="detail-panel">
-        <button class="detail-close"
-                onclick="closePanel()">
-            <i class="ti ti-x"></i>
-        </button>
-        <div id="detail-panel-inner">
-            <!-- Filled by JavaScript -->
-        </div>
-    </div>
-
-    <!-- Chat panel -->
-    <div id="chat-panel">
-        <div style="
-            padding:1rem 1.25rem;
-            border-bottom:1px solid #1e1e3a;
-            display:flex;align-items:center;
-            justify-content:space-between;
-        ">
-            <div id="chat-header"
-                 style="color:#fff;
-                        font-size:0.9rem;
-                        font-weight:500">
-                Messages
-            </div>
-            <button onclick="closeChat()"
-                    style="background:#1e1e3a;
-                           border:none;color:#888;
-                           width:28px;height:28px;
-                           border-radius:6px;
-                           cursor:pointer;
-                           display:flex;
-                           align-items:center;
-                           justify-content:center">
-                <i class="ti ti-x"
-                   style="font-size:0.85rem"></i>
-            </button>
-        </div>
-        <div id="chat-messages"
-             style="flex:1;overflow-y:auto;
-                    padding:1rem;
-                    display:flex;
-                    flex-direction:column;
-                    gap:0.5rem">
-        </div>
-        <div style="
-            padding:0.75rem;
-            border-top:1px solid #1e1e3a;
-            display:flex;gap:0.5rem;
-        ">
-            <input type="text"
-                   id="chat-input"
-                   placeholder="Type a message..."
-                   style="flex:1;background:#0d0d1a;
-                          border:1px solid #1e1e3a;
-                          color:#e0e0e0;
-                          border-radius:8px;
-                          padding:0.5rem 0.75rem;
-                          font-size:0.85rem;
-                          outline:none"
-                   onkeypress="
-                     if(event.key==='Enter')
-                       sendMessage()">
-            <button onclick="sendMessage()"
-                    style="background:#00d4ff;
-                           border:none;color:#000;
-                           width:36px;height:36px;
-                           border-radius:8px;
-                           cursor:pointer;
-                           display:flex;
-                           align-items:center;
-                           justify-content:center;
-                           font-size:1rem;
-                           flex-shrink:0">
-                <i class="ti ti-send"></i>
-            </button>
-        </div>
     </div>
 
 </div>
@@ -555,532 +373,621 @@ $myMember = getUserMember($pdo, $user['id']);
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 
 <script>
-// ── Configuration ─────────────────────────────
-const SITE_URL  = '<?= SITE_URL ?>';
-const ROOT_ID   = <?= $myMember['member_id'] ?>;
-const MY_NAME   = '<?= addslashes($user['name']) ?>';
+const SITE_URL = '<?= SITE_URL ?>';
+const ROOT_ID  = <?= $myMember['member_id'] ?>;
 
-// Node dimensions
-const NODE_R    = 36;  // circle radius
-const NODE_W    = 140; // card width
-const NODE_H    = 80;  // card height
+// Card dimensions
+const CW = 150; // card width
+const CH = 72;  // card height
+const GH = 180; // vertical gap between generations
+const GW = 180; // horizontal gap between siblings
 
-// ── State ─────────────────────────────────────
-let treeData    = null;
-let simulation  = null;
-let svg         = null;
-let g           = null;
-let zoom        = null;
-let selectedNode = null;
-let chatReceiverId = null;
+let svg, g, zoom, treeData;
 
-// ── Load tree data ────────────────────────────
+// ── Load data ─────────────────────────────────
 async function loadTree() {
     try {
-        const res = await fetch(
+        const res  = await fetch(
             SITE_URL + '/api/tree.php'
         );
         treeData = await res.json();
 
-        if (treeData.error) {
-            showEmptyState();
-            return;
-        }
-
-        if (!treeData.nodes
+        if (treeData.error
+            || !treeData.nodes
             || treeData.nodes.length === 0) {
-            showEmptyState();
+            showEmpty();
             return;
         }
 
-        // Update member count
         document.getElementById('member-count')
             .textContent =
             treeData.counts.total + ' member' +
-            (treeData.counts.total !== 1 ? 's' : '');
+            (treeData.counts.total !== 1
+                ? 's' : '');
 
-        renderTree(treeData);
+        buildHierarchy(treeData);
 
-    } catch (err) {
-        console.error('Tree load error:', err);
-        showEmptyState();
+    } catch(e) {
+        console.error(e);
+        showEmpty();
     }
 }
 
-// ── Render tree with D3 ───────────────────────
-function renderTree(data) {
+// ── Build generation layers ───────────────────
+function buildHierarchy(data) {
+    const nodes = data.nodes;
+    const links = data.links;
+
+    // Assign generation levels
+    // Root = level 0
+    // Parents = level -1, -2 etc (going up)
+    // Children = level 1, 2 etc (going down)
+    const levelMap = {};
+    levelMap[ROOT_ID] = 0;
+
+    // BFS to assign levels
+    const visited = new Set([ROOT_ID]);
+    const queue   = [ROOT_ID];
+
+    while (queue.length) {
+        const current = queue.shift();
+        const currentLevel = levelMap[current];
+
+        links.forEach(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+
+            // Parent of current → one level up
+            if (tgt === current
+                && l.type === 'parent'
+                && !visited.has(src)) {
+                levelMap[src] = currentLevel - 1;
+                visited.add(src);
+                queue.push(src);
+            }
+
+            // Child of current → one level down
+            if (src === current
+                && l.type === 'parent'
+                && !visited.has(tgt)) {
+                levelMap[tgt] = currentLevel + 1;
+                visited.add(tgt);
+                queue.push(tgt);
+            }
+
+            // Spouse → same level
+            if (l.type === 'spouse') {
+                if (src === current
+                    && !visited.has(tgt)) {
+                    levelMap[tgt] = currentLevel;
+                    visited.add(tgt);
+                    queue.push(tgt);
+                }
+                if (tgt === current
+                    && !visited.has(src)) {
+                    levelMap[src] = currentLevel;
+                    visited.add(src);
+                    queue.push(src);
+                }
+            }
+
+            // Sibling → same level
+            if (l.type === 'sibling') {
+                if (src === current
+                    && !visited.has(tgt)) {
+                    levelMap[tgt] = currentLevel;
+                    visited.add(tgt);
+                    queue.push(tgt);
+                }
+                if (tgt === current
+                    && !visited.has(src)) {
+                    levelMap[src] = currentLevel;
+                    visited.add(src);
+                    queue.push(src);
+                }
+            }
+        });
+    }
+
+    // Any unvisited nodes → level 0
+    nodes.forEach(n => {
+        if (levelMap[n.id] === undefined) {
+            levelMap[n.id] = 0;
+        }
+    });
+
+    // Group nodes by level
+    const levels = {};
+    nodes.forEach(n => {
+        const lv = levelMap[n.id];
+        if (!levels[lv]) levels[lv] = [];
+        levels[lv].push(n);
+    });
+
+    // Sort levels
+    const sortedLevels = Object.keys(levels)
+        .map(Number)
+        .sort((a,b) => a - b);
+
+    const minLevel = sortedLevels[0];
+    const maxLevel = sortedLevels[sortedLevels.length-1];
+
+    // Assign x,y positions
+    const positions = {};
+
+    sortedLevels.forEach(lv => {
+        const members = levels[lv];
+        const totalW  = members.length * GW;
+        const startX  = -totalW / 2 + GW / 2;
+        const y       = lv * GH;
+
+        members.forEach((n, i) => {
+            positions[n.id] = {
+                x: startX + i * GW,
+                y: y,
+            };
+        });
+    });
+
+    renderHierarchy(
+        nodes, links, positions,
+        levelMap, sortedLevels
+    );
+}
+
+// ── Render ────────────────────────────────────
+function renderHierarchy(
+    nodes, links, positions,
+    levelMap, sortedLevels
+) {
     const container =
-        document.getElementById('tree-container');
+        document.getElementById('tree-page');
     const W = container.offsetWidth;
     const H = container.offsetHeight;
 
     svg = d3.select('#tree-svg');
     g   = d3.select('#tree-g');
 
-    // ── Zoom behaviour ────────────────────────
     zoom = d3.zoom()
-        .scaleExtent([0.2, 3])
-        .on('zoom', (event) => {
-            g.attr('transform', event.transform);
+        .scaleExtent([0.15, 3])
+        .on('zoom', ev => {
+            g.attr('transform', ev.transform);
         });
 
     svg.call(zoom);
 
-    // ── Force simulation ──────────────────────
-    simulation = d3.forceSimulation(data.nodes)
-        .force('link', d3.forceLink(data.links)
-            .id(d => d.id)
-            .distance(d => {
-                if (d.type === 'spouse') return 100;
-                if (d.type === 'sibling') return 120;
-                return 160; // parent/child
-            })
-            .strength(0.8)
-        )
-        .force('charge', d3.forceManyBody()
-            .strength(-400)
-        )
-        .force('center', d3.forceCenter(W/2, H/2))
-        .force('collision', d3.forceCollide()
-            .radius(NODE_R + 20)
-        )
-        .force('x', d3.forceX(W/2).strength(0.03))
-        .force('y', d3.forceY()
-            .y(d => {
-                // Push parents up, children down
-                const isParentOfRoot =
-                    data.links.some(l =>
-                        (l.source.id === d.id
-                         || l.source === d.id)
-                        && (l.target.id === ROOT_ID
-                            || l.target === ROOT_ID)
-                        && l.type === 'parent'
-                    );
-                const isChildOfRoot =
-                    data.links.some(l =>
-                        (l.source.id === ROOT_ID
-                         || l.source === ROOT_ID)
-                        && (l.target.id === d.id
-                            || l.target === d.id)
-                        && l.type === 'parent'
-                    );
-                if (d.id === ROOT_ID) return H/2;
-                if (isParentOfRoot)   return H/2 - 200;
-                if (isChildOfRoot)    return H/2 + 200;
-                return H/2;
-            })
-            .strength(0.15)
-        );
+    // ── Generation label lines ────────────────
+    const genLabels = {
+        '-3': 'Great Grandparents',
+        '-2': 'Grandparents',
+        '-1': 'Parents',
+         '0': 'Your Generation',
+         '1': 'Children',
+         '2': 'Grandchildren',
+    };
 
-    // ── Draw links ────────────────────────────
-    const link = g.selectAll('.tree-link')
-        .data(data.links)
-        .enter()
-        .append('line')
-        .attr('class', d =>
-            'tree-link link-' + d.type
-        );
+    sortedLevels.forEach(lv => {
+        const y = lv * GH;
+        const label = genLabels[lv] || '';
+        if (!label) return;
 
-    // ── Draw node groups ──────────────────────
-    const node = g.selectAll('.tree-node')
-        .data(data.nodes)
-        .enter()
-        .append('g')
-        .attr('class', 'tree-node')
-        .style('cursor', 'pointer')
-        .call(d3.drag()
-            .on('start', dragStart)
-            .on('drag',  dragging)
-            .on('end',   dragEnd)
-        )
-        .on('click', (event, d) => {
-            event.stopPropagation();
-            showDetail(d);
-        });
+        g.append('line')
+            .attr('x1', -2000)
+            .attr('y1', y - CH/2 - 18)
+            .attr('x2',  2000)
+            .attr('y2', y - CH/2 - 18)
+            .attr('stroke', '#1a1a2e')
+            .attr('stroke-width', 1);
 
-    // ── Node card background ──────────────────
-    node.append('rect')
-        .attr('x',  -NODE_W/2)
-        .attr('y',  -NODE_H/2)
-        .attr('width',  NODE_W)
-        .attr('height', NODE_H)
-        .attr('rx', 12)
-        .attr('ry', 12)
-        .attr('fill', d => {
-            if (d.id === ROOT_ID) return '#0d1a3e';
-            if (d.is_deceased)    return '#111';
-            if (d.gender === 'female') return '#1a0d1a';
-            return '#0d1526';
-        })
-        .attr('stroke', d => {
-            if (d.id === ROOT_ID) return '#00d4ff';
-            if (d.is_deceased)    return '#444';
-            if (d.gender === 'female') return '#d94a8a';
-            return '#4a90d9';
-        })
-        .attr('stroke-width', d =>
-            d.id === ROOT_ID ? 2.5 : 1.5
-        )
-        .attr('stroke-dasharray', d =>
-            d.is_deceased ? '5,3' : 'none'
-        );
-
-    // ── Avatar circle ─────────────────────────
-    node.append('circle')
-        .attr('cx', -NODE_W/2 + 28)
-        .attr('cy', 0)
-        .attr('r',  18)
-        .attr('fill', d => {
-            if (d.id === ROOT_ID) return '#1a2a5e';
-            if (d.is_deceased)    return '#222';
-            if (d.gender === 'female') return '#2e1020';
-            return '#0d1e3a';
-        })
-        .attr('stroke', d => {
-            if (d.id === ROOT_ID) return '#00d4ff';
-            if (d.is_deceased)    return '#555';
-            if (d.gender === 'female') return '#d94a8a';
-            return '#4a90d9';
-        })
-        .attr('stroke-width', 1.5);
-
-    // ── Avatar initial ────────────────────────
-    node.append('text')
-        .attr('x', -NODE_W/2 + 28)
-        .attr('y', 5)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '13px')
-        .attr('font-weight', '600')
-        .attr('font-family', 'Segoe UI, sans-serif')
-        .attr('fill', d => {
-            if (d.id === ROOT_ID) return '#00d4ff';
-            if (d.is_deceased)    return '#555';
-            if (d.gender === 'female') return '#d94a8a';
-            return '#4a90d9';
-        })
-        .text(d =>
-            d.name.charAt(0).toUpperCase()
-        );
-
-    // ── Name text ─────────────────────────────
-    node.append('text')
-        .attr('class', 'node-name')
-        .attr('x', -NODE_W/2 + 54)
-        .attr('y', d => d.date_range ? -8 : 5)
-        .attr('text-anchor', 'start')
-        .attr('font-size', '12px')
-        .attr('font-weight', '500')
-        .attr('font-family', 'Segoe UI, sans-serif')
-        .attr('fill', d =>
-            d.id === ROOT_ID ? '#fff' : '#ddd'
-        )
-        .text(d => {
-            const name = d.preferred_name || d.name;
-            // Truncate long names
-            return name.length > 14
-                ? name.substring(0, 13) + '…'
-                : name;
-        });
-
-    // ── Date range ────────────────────────────
-    node.filter(d => d.date_range)
-        .append('text')
-        .attr('x', -NODE_W/2 + 54)
-        .attr('y', 8)
-        .attr('text-anchor', 'start')
-        .attr('font-size', '10px')
-        .attr('font-family', 'Segoe UI, sans-serif')
-        .attr('fill', '#666')
-        .text(d => d.date_range);
-
-    // ── Quarter badge ─────────────────────────
-    node.append('text')
-        .attr('x', -NODE_W/2 + 54)
-        .attr('y', d => d.date_range ? 22 : 20)
-        .attr('text-anchor', 'start')
-        .attr('font-size', '9px')
-        .attr('font-family', 'Segoe UI, sans-serif')
-        .attr('fill', d =>
-            d.quarter_id ? '#00d4ff' : '#888'
-        )
-        .attr('opacity', 0.8)
-        .text(d => d.quarter
-            ? d.quarter.substring(0, 16)
-            : '');
-
-    // ── Root YOU badge ────────────────────────
-    node.filter(d => d.id === ROOT_ID)
-        .append('rect')
-        .attr('x',  NODE_W/2 - 36)
-        .attr('y', -NODE_H/2 + 2)
-        .attr('width',  32)
-        .attr('height', 16)
-        .attr('rx', 4)
-        .attr('fill', '#00d4ff');
-
-    node.filter(d => d.id === ROOT_ID)
-        .append('text')
-        .attr('x', NODE_W/2 - 20)
-        .attr('y', -NODE_H/2 + 13)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '8px')
-        .attr('font-weight', '700')
-        .attr('font-family', 'Segoe UI, sans-serif')
-        .attr('fill', '#000')
-        .text('YOU');
-
-    // ── Verified badge ────────────────────────
-    node.filter(d => d.verified && d.id !== ROOT_ID)
-        .append('circle')
-        .attr('cx', NODE_W/2 - 10)
-        .attr('cy', -NODE_H/2 + 10)
-        .attr('r',  7)
-        .attr('fill', '#00d4ff')
-        .attr('opacity', 0.9);
-
-    node.filter(d => d.verified && d.id !== ROOT_ID)
-        .append('text')
-        .attr('x', NODE_W/2 - 10)
-        .attr('y', -NODE_H/2 + 14)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '8px')
-        .attr('fill', '#000')
-        .attr('font-weight', '700')
-        .text('✓');
-
-    // ── Deceased indicator ────────────────────
-    node.filter(d => d.is_deceased)
-        .append('text')
-        .attr('x', NODE_W/2 - 10)
-        .attr('y',  NODE_H/2 - 4)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '10px')
-        .attr('fill', '#555')
-        .text('†');
-
-    // ── Click on SVG background to deselect ──
-    svg.on('click', () => {
-        closePanel();
+        g.append('text')
+            .attr('x', -600)
+            .attr('y', y - CH/2 - 5)
+            .attr('font-size', '10px')
+            .attr('font-family',
+                  'Segoe UI, sans-serif')
+            .attr('fill', '#2a2a4a')
+            .attr('font-weight', '600')
+            .attr('text-transform', 'uppercase')
+            .attr('letter-spacing', '0.08em')
+            .text(label.toUpperCase());
     });
 
-    // ── Simulation tick ───────────────────────
-    simulation.on('tick', () => {
-        link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
+    // ── Draw links first (behind nodes) ───────
+    // Only draw parent-child links as curved paths
+    // Spouse and sibling as straight lines
+    links.forEach(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        const p1  = positions[src];
+        const p2  = positions[tgt];
+        if (!p1 || !p2) return;
 
-        node.attr('transform',
-            d => `translate(${d.x},${d.y})`
-        );
+        if (l.type === 'parent') {
+            // Curved path from parent to child
+            const lv1 = levelMap[src];
+            const lv2 = levelMap[tgt];
+            if (lv1 < lv2) {
+                // src is ancestor, tgt is descendant
+                const mx = (p1.x + p2.x) / 2;
+                const my = (p1.y + p2.y) / 2;
+                g.append('path')
+                    .attr('class', 'link-parent')
+                    .attr('d', `
+                        M ${p1.x} ${p1.y + CH/2}
+                        C ${p1.x} ${my},
+                          ${p2.x} ${my},
+                          ${p2.x} ${p2.y - CH/2}
+                    `);
+            }
+        } else if (l.type === 'spouse') {
+            g.append('line')
+                .attr('class', 'link-spouse')
+                .attr('x1', p1.x + CW/2)
+                .attr('y1', p1.y)
+                .attr('x2', p2.x - CW/2)
+                .attr('y2', p2.y);
+        } else if (l.type === 'sibling') {
+            // Only draw once
+            if (src < tgt) {
+                g.append('line')
+                    .attr('class', 'link-sibling')
+                    .attr('x1', p1.x + CW/2)
+                    .attr('y1', p1.y)
+                    .attr('x2', p2.x - CW/2)
+                    .attr('y2', p2.y);
+            }
+        }
     });
 
-    // ── Auto center after stabilization ───────
-    setTimeout(() => {
-        resetView();
-    }, 1500);
+    // ── Draw nodes ────────────────────────────
+    nodes.forEach(n => {
+        const pos = positions[n.id];
+        if (!pos) return;
+
+        const isRoot = n.id === ROOT_ID;
+        const ng = g.append('g')
+            .attr('class', 'node-card')
+            .attr('transform',
+                `translate(${pos.x},${pos.y})`)
+            .on('click', () => showDetail(n));
+
+        // Card background
+        ng.append('rect')
+            .attr('class', 'card-bg')
+            .attr('x',  -CW/2)
+            .attr('y',  -CH/2)
+            .attr('width',  CW)
+            .attr('height', CH)
+            .attr('rx', 10)
+            .attr('ry', 10)
+            .attr('fill', () => {
+                if (isRoot)
+                    return '#0d1a3e';
+                if (n.is_deceased)
+                    return '#0f0f0f';
+                if (n.gender === 'female')
+                    return '#1a0d1a';
+                return '#0d1526';
+            })
+            .attr('stroke', () => {
+                if (isRoot)
+                    return '#00d4ff';
+                if (n.is_deceased)
+                    return '#444';
+                if (n.gender === 'female')
+                    return '#d94a8a';
+                return '#4a90d9';
+            })
+            .attr('stroke-width',
+                isRoot ? 2.5 : 1.5)
+            .attr('stroke-dasharray',
+                n.is_deceased ? '5,3' : 'none');
+
+        // Avatar circle
+        const avatarColor = isRoot
+            ? '#00d4ff'
+            : n.is_deceased
+                ? '#444'
+                : n.gender === 'female'
+                    ? '#d94a8a'
+                    : '#4a90d9';
+
+        ng.append('circle')
+            .attr('cx', -CW/2 + 24)
+            .attr('cy', 0)
+            .attr('r',  16)
+            .attr('fill', () => {
+                if (isRoot) return '#1a2a5e';
+                if (n.is_deceased) return '#1a1a1a';
+                if (n.gender === 'female')
+                    return '#2e0d2e';
+                return '#0d1e3a';
+            })
+            .attr('stroke', avatarColor)
+            .attr('stroke-width', 1.5);
+
+        // Initial
+        ng.append('text')
+            .attr('x', -CW/2 + 24)
+            .attr('y', 5)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '12px')
+            .attr('font-weight', '700')
+            .attr('font-family',
+                  'Segoe UI, sans-serif')
+            .attr('fill', avatarColor)
+            .text(n.name.charAt(0).toUpperCase());
+
+        // Name
+        const displayName =
+            n.preferred_name || n.name;
+        const truncName = displayName.length > 12
+            ? displayName.substring(0, 11) + '…'
+            : displayName;
+
+        ng.append('text')
+            .attr('x', -CW/2 + 47)
+            .attr('y', n.date_range ? -10 : 5)
+            .attr('font-size', '12px')
+            .attr('font-weight', '600')
+            .attr('font-family',
+                  'Segoe UI, sans-serif')
+            .attr('fill', isRoot ? '#fff' : '#ddd')
+            .text(truncName);
+
+        // Date range
+        if (n.date_range) {
+            ng.append('text')
+                .attr('x', -CW/2 + 47)
+                .attr('y', 5)
+                .attr('font-size', '9px')
+                .attr('font-family',
+                      'Segoe UI, sans-serif')
+                .attr('fill', '#666')
+                .text(n.date_range);
+        }
+
+        // Quarter
+        ng.append('text')
+            .attr('x', -CW/2 + 47)
+            .attr('y', n.date_range ? 19 : 18)
+            .attr('font-size', '8.5px')
+            .attr('font-family',
+                  'Segoe UI, sans-serif')
+            .attr('fill',
+                n.quarter_id ? '#00d4ff' : '#666')
+            .attr('opacity', 0.8)
+            .text(n.quarter
+                ? n.quarter.substring(0, 14)
+                : '');
+
+        // YOU badge
+        if (isRoot) {
+            ng.append('rect')
+                .attr('x',  CW/2 - 34)
+                .attr('y', -CH/2 + 3)
+                .attr('width',  30)
+                .attr('height', 15)
+                .attr('rx', 4)
+                .attr('fill', '#00d4ff');
+
+            ng.append('text')
+                .attr('x', CW/2 - 19)
+                .attr('y', -CH/2 + 13)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '8px')
+                .attr('font-weight', '800')
+                .attr('font-family',
+                      'Segoe UI, sans-serif')
+                .attr('fill', '#000')
+                .text('YOU');
+        }
+
+        // Verified badge
+        if (n.verified && !isRoot) {
+            ng.append('circle')
+                .attr('cx', CW/2 - 8)
+                .attr('cy', -CH/2 + 8)
+                .attr('r',  7)
+                .attr('fill', '#00d4ff');
+
+            ng.append('text')
+                .attr('x', CW/2 - 8)
+                .attr('y', -CH/2 + 12)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '8px')
+                .attr('font-weight', '700')
+                .attr('fill', '#000')
+                .text('✓');
+        }
+
+        // Deceased cross
+        if (n.is_deceased) {
+            ng.append('text')
+                .attr('x',  CW/2 - 8)
+                .attr('y',  CH/2 - 4)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '10px')
+                .attr('fill', '#555')
+                .text('†');
+        }
+    });
+
+    // ── Click background to close panel ───────
+    svg.on('click', () => closePanel());
+
+    // ── Initial center view ───────────────────
+    setTimeout(() => resetView(), 100);
 }
 
-// ── Drag handlers ─────────────────────────────
-function dragStart(event, d) {
-    if (!event.active)
-        simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
-}
+// ── Detail panel ──────────────────────────────
+function showDetail(n) {
+    const isRoot = n.id === ROOT_ID;
+    const gc = n.gender === 'female'
+        ? '#d94a8a'
+        : isRoot ? '#00d4ff' : '#4a90d9';
 
-function dragging(event, d) {
-    d.fx = event.x;
-    d.fy = event.y;
-}
+    document.getElementById('panel-content')
+        .innerHTML = `
 
-function dragEnd(event, d) {
-    if (!event.active)
-        simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
-}
-
-// ── Show member detail panel ──────────────────
-function showDetail(d) {
-    selectedNode = d;
-    const panel =
-        document.getElementById('detail-panel');
-    const inner =
-        document.getElementById(
-            'detail-panel-inner'
-        );
-
-    const isRoot = d.id === ROOT_ID;
-    const genderColor =
-        d.gender === 'female' ? '#d94a8a' :
-        d.id === ROOT_ID      ? '#00d4ff' :
-        '#4a90d9';
-
-    inner.innerHTML = `
         <div style="text-align:center;
-                    padding-top:1rem;
                     margin-bottom:1.5rem">
-
-            <!-- Avatar -->
             <div style="
-                width:64px;height:64px;
+                width:60px;height:60px;
                 border-radius:50%;
-                background:${d.gender === 'female'
-                    ? '#2e0d1a' : '#0d1a2e'};
-                border:2px solid ${genderColor};
+                background:${
+                    n.gender === 'female'
+                    ? '#2e0d2e' : '#0d1e3a'
+                };
+                border:2px solid ${gc};
+                ${n.is_deceased
+                    ? 'border-style:dashed;' : ''}
                 display:flex;align-items:center;
                 justify-content:center;
-                font-size:1.5rem;font-weight:600;
-                color:${genderColor};
-                margin:0 auto 1rem;
-                ${d.is_deceased
-                    ? 'border-style:dashed;'
-                    : ''}
+                font-size:1.4rem;font-weight:700;
+                color:${gc};
+                margin:0 auto 0.75rem;
             ">
-                ${d.name.charAt(0).toUpperCase()}
+                ${n.name.charAt(0).toUpperCase()}
             </div>
-
-            <!-- Name -->
-            <h4 style="color:#fff;font-size:1.1rem;
+            <h4 style="color:#fff;font-size:1rem;
                        font-weight:600;
-                       margin-bottom:4px">
-                ${escHtml(d.name)}
+                       margin-bottom:3px">
+                ${esc(n.name)}
             </h4>
-
-            ${d.preferred_name ? `
-            <div style="color:#888;font-size:0.85rem;
-                        margin-bottom:6px">
-                "${escHtml(d.preferred_name)}"
+            ${n.preferred_name ? `
+            <div style="color:#888;
+                        font-size:0.82rem;
+                        margin-bottom:5px">
+                "${esc(n.preferred_name)}"
             </div>` : ''}
-
-            <!-- Quarter badge -->
             <div style="
                 display:inline-block;
                 background:rgba(0,212,255,0.1);
                 border:1px solid rgba(0,212,255,0.2);
-                color:#00d4ff;font-size:0.75rem;
-                padding:3px 10px;border-radius:20px;
-                margin-bottom:0.75rem;
+                color:#00d4ff;font-size:0.72rem;
+                padding:2px 10px;border-radius:20px;
             ">
-                ${escHtml(d.quarter || 'Unknown')}
+                ${esc(n.quarter || 'Unknown')}
             </div>
-
-            ${d.is_deceased ? `
-            <div style="color:#555;font-size:0.8rem">
+            ${n.is_deceased ? `
+            <div style="color:#555;
+                        font-size:0.78rem;
+                        margin-top:5px">
                 † Deceased
             </div>` : ''}
-
-            ${d.verified ? `
+            ${n.verified ? `
             <div style="color:#00d4ff;
-                        font-size:0.78rem;
-                        margin-top:4px">
-                <i>✓ Verified record</i>
+                        font-size:0.75rem;
+                        margin-top:3px">
+                ✓ Verified record
             </div>` : ''}
         </div>
 
-        <!-- Vital stats -->
         <div style="
             background:#0d0d1a;
             border:1px solid #1e1e3a;
             border-radius:10px;
-            padding:1rem;
+            padding:0.85rem 1rem;
             margin-bottom:1rem;
         ">
-            ${d.date_range ? `
-            <div style="
-                display:flex;gap:8px;
-                align-items:flex-start;
-                margin-bottom:0.6rem;
-            ">
+            ${n.date_range ? `
+            <div style="display:flex;gap:8px;
+                        margin-bottom:0.5rem">
                 <span style="color:#555;
-                             font-size:0.8rem;
-                             min-width:20px">📅</span>
+                             font-size:0.82rem">
+                    📅
+                </span>
                 <span style="color:#aaa;
-                             font-size:0.85rem">
-                    ${escHtml(d.date_range)}
+                             font-size:0.82rem">
+                    ${esc(n.date_range)}
                 </span>
             </div>` : ''}
-
-            ${d.birthplace ? `
-            <div style="
-                display:flex;gap:8px;
-                align-items:flex-start;
-                margin-bottom:0.6rem;
-            ">
+            ${n.birthplace ? `
+            <div style="display:flex;gap:8px;
+                        margin-bottom:0.5rem">
                 <span style="color:#555;
-                             font-size:0.8rem;
-                             min-width:20px">📍</span>
+                             font-size:0.82rem">
+                    📍
+                </span>
                 <span style="color:#aaa;
-                             font-size:0.85rem">
-                    ${escHtml(d.birthplace)}
+                             font-size:0.82rem">
+                    ${esc(n.birthplace)}
                 </span>
             </div>` : ''}
-
-            ${d.occupation ? `
-            <div style="
-                display:flex;gap:8px;
-                align-items:flex-start;
-            ">
+            ${n.occupation ? `
+            <div style="display:flex;gap:8px">
                 <span style="color:#555;
-                             font-size:0.8rem;
-                             min-width:20px">💼</span>
-                <span style="color:#aaa;
-                             font-size:0.85rem">
-                    ${escHtml(d.occupation)}
+                             font-size:0.82rem">
+                    💼
                 </span>
+                <span style="color:#aaa;
+                             font-size:0.82rem">
+                    ${esc(n.occupation)}
+                </span>
+            </div>` : ''}
+            ${!n.date_range
+              && !n.birthplace
+              && !n.occupation ? `
+            <div style="color:#555;
+                        font-size:0.82rem;
+                        font-style:italic">
+                No additional details recorded
             </div>` : ''}
         </div>
 
-        <!-- Bio -->
-        ${d.bio ? `
+        ${n.bio ? `
         <div style="
-            color:#888;font-size:0.85rem;
-            line-height:1.6;margin-bottom:1rem;
+            color:#888;font-size:0.82rem;
+            line-height:1.6;
             padding:0.75rem;
             border-left:2px solid #1e1e3a;
+            margin-bottom:1rem;
         ">
-            ${escHtml(d.bio)}
+            ${esc(n.bio)}
         </div>` : ''}
 
-        <!-- Actions -->
         <div style="
-            display:flex;flex-direction:column;
-            gap:0.5rem;margin-top:1rem;
+            display:flex;
+            flex-direction:column;
+            gap:0.5rem;
+            margin-top:1rem;
         ">
             ${!isRoot ? `
-            <button onclick="openChat(${d.id},
-                '${escHtml(d.name)}')"
+            <button onclick="openChat(
+                ${n.id}, '${esc(n.name)}')"
                 style="
                     background:#00d4ff;
                     border:none;color:#000;
-                    padding:0.6rem;
+                    padding:0.65rem;
                     border-radius:8px;
                     font-size:0.85rem;
                     font-weight:600;
                     cursor:pointer;
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    gap:6px;
+                    width:100%;
                 ">
                 💬 Send Message
-            </button>` : ''}
-
+            </button>` : `
+            <div style="
+                background:rgba(0,212,255,0.06);
+                border:1px solid rgba(0,212,255,0.15);
+                border-radius:8px;
+                padding:0.65rem;
+                text-align:center;
+                color:#00d4ff;
+                font-size:0.82rem;
+            ">
+                This is your profile node
+            </div>`}
             <a href="${SITE_URL}/family/add.php"
                style="
                     background:#1e1e3a;
                     border:1px solid #2a2a4a;
-                    color:#aaa;
-                    padding:0.6rem;
+                    color:#aaa;padding:0.65rem;
                     border-radius:8px;
                     font-size:0.85rem;
-                    cursor:pointer;
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    gap:6px;
+                    display:block;
+                    text-align:center;
                     text-decoration:none;
                ">
                 + Add Their Relative
@@ -1088,181 +995,71 @@ function showDetail(d) {
         </div>
     `;
 
-    panel.classList.add('open');
+    document.getElementById('detail-panel')
+        .classList.add('open');
 }
 
-// ── Close detail panel ────────────────────────
 function closePanel() {
     document.getElementById('detail-panel')
         .classList.remove('open');
-    selectedNode = null;
 }
 
-// ── Chat panel ────────────────────────────────
+// ── Chat ──────────────────────────────────────
 function openChat(userId, userName) {
-    chatReceiverId = userId;
-    document.getElementById('chat-header')
-        .textContent = '💬 ' + userName;
-    document.getElementById('chat-messages')
-        .innerHTML = `
-        <div style="text-align:center;
-                    color:#555;font-size:0.8rem;
-                    padding:1rem">
-            Start a conversation with
-            ${escHtml(userName)}
-        </div>`;
-    document.getElementById('chat-panel')
-        .classList.add('open');
-    document.getElementById('chat-input')
-        .focus();
-    loadMessages(userId);
+    alert('Messaging coming soon.\nYou selected: '
+          + userName);
 }
 
-function closeChat() {
-    document.getElementById('chat-panel')
-        .classList.remove('open');
-    chatReceiverId = null;
-}
-
-async function loadMessages(receiverId) {
-    try {
-        const res = await fetch(
-            SITE_URL +
-            '/api/messages.php?with=' + receiverId
-        );
-        const data = await res.json();
-        if (data.messages) {
-            renderMessages(data.messages);
-        }
-    } catch (e) {
-        console.log('Messages not yet implemented');
-    }
-}
-
-function renderMessages(messages) {
-    const container =
-        document.getElementById('chat-messages');
-    if (!messages.length) return;
-
-    container.innerHTML = messages.map(m => `
-        <div style="
-            display:flex;
-            justify-content:${
-                m.is_mine ? 'flex-end' : 'flex-start'
-            };
-        ">
-            <div style="
-                background:${
-                    m.is_mine
-                    ? '#00d4ff'
-                    : '#1e1e3a'
-                };
-                color:${m.is_mine ? '#000' : '#ddd'};
-                padding:0.5rem 0.75rem;
-                border-radius:10px;
-                font-size:0.82rem;
-                max-width:75%;
-                line-height:1.4;
-            ">
-                ${escHtml(m.message_text)}
-                <div style="
-                    font-size:0.7rem;
-                    opacity:0.6;
-                    margin-top:2px;
-                    text-align:right;
-                ">
-                    ${m.time}
-                </div>
-            </div>
-        </div>
-    `).join('');
-
-    container.scrollTop = container.scrollHeight;
-}
-
-async function sendMessage() {
-    const input =
-        document.getElementById('chat-input');
-    const text = input.value.trim();
-    if (!text || !chatReceiverId) return;
-
-    try {
-        await fetch(
-            SITE_URL + '/api/messages.php',
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type':
-                    'application/json'
-                },
-                body: JSON.stringify({
-                    receiver_id: chatReceiverId,
-                    message: text,
-                })
-            }
-        );
-        input.value = '';
-        loadMessages(chatReceiverId);
-    } catch (e) {
-        console.log('Send failed');
-    }
-}
-
-// ── Zoom controls ─────────────────────────────
+// ── Zoom ──────────────────────────────────────
 function zoomIn() {
-    svg.transition().duration(300)
+    svg.transition().duration(250)
         .call(zoom.scaleBy, 1.4);
 }
 
 function zoomOut() {
-    svg.transition().duration(300)
+    svg.transition().duration(250)
         .call(zoom.scaleBy, 0.7);
 }
 
 function resetView() {
-    const container =
-        document.getElementById('tree-container');
-    const W = container.offsetWidth;
-    const H = container.offsetHeight;
-
+    const el =
+        document.getElementById('tree-page');
+    const W = el.offsetWidth;
+    const H = el.offsetHeight;
     svg.transition().duration(600)
         .call(zoom.transform,
             d3.zoomIdentity
                 .translate(W/2, H/2)
-                .scale(0.85)
-                .translate(-W/2, -H/2)
+                .scale(0.9)
         );
 }
 
-// ── Legend toggle ─────────────────────────────
 function toggleLegend() {
-    const legend =
-        document.getElementById('tree-legend');
-    legend.style.display =
-        legend.style.display === 'none'
-        ? 'block' : 'none';
+    const l = document.getElementById(
+        'tree-legend'
+    );
+    l.style.display =
+        l.style.display === 'block'
+        ? 'none' : 'block';
 }
 
-// ── Empty state ───────────────────────────────
-function showEmptyState() {
+function showEmpty() {
     document.getElementById('empty-state')
         .style.display = 'block';
     document.getElementById('member-count')
         .textContent = '0 members';
 }
 
-// ── Utility: escape HTML ──────────────────────
-function escHtml(str) {
+function esc(str) {
     if (!str) return '';
     return String(str)
-        .replace(/&/g,  '&amp;')
-        .replace(/</g,  '&lt;')
-        .replace(/>/g,  '&gt;')
-        .replace(/"/g,  '&quot;')
-        .replace(/'/g,  '&#39;');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
-// ── Init ──────────────────────────────────────
 loadTree();
 </script>
 
