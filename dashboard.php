@@ -169,7 +169,10 @@ $recent = $pdo->query("
               letter-spacing:0.05em;
               margin-bottom:4px;
             ">
-              <?= clean($c['relation_type']) ?>
+              <?= clean(getRelationLabel(
+                $c['relation_label'] ?? null,
+                $c['relation_type']
+              )) ?>
             </div>
             <div style="color:#fff;font-size:0.9rem">
               <?= clean($c['full_name']) ?>
