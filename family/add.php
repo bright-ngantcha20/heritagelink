@@ -6,25 +6,84 @@ require_once '../includes/functions.php';
 
 requireLogin();
 
+// User must have a profile before adding members
+if (!hasProfile($pdo, $_SESSION['user_id'])) {
+    redirect(SITE_URL . '/settings/profile.php');
+}
+
 $errors  = [];
 $success = false;
 $user    = currentUser();
+$myMember = getUserMember($pdo, $user['id']);
 
-// Load existing members for the relationship dropdown
-$existing_members = $pdo->query("
-    SELECT
-        fm.member_id,
-        fm.full_name,
-        q.name AS quarter_name
-    FROM family_members fm
-    LEFT JOIN quarters q
-        ON fm.quarter_id = q.quarter_id
-    ORDER BY fm.full_name ASC
-")->fetchAll();
+// Relationship options
+// describing how the new person
+// relates to the logged-in user
+$relation_options = [
+    'Immediate Family' => [
+        'father'      => 'Father',
+        'mother'      => 'Mother',
+        'spouse'      => 'Spouse / Partner',
+        'son'         => 'Son',
+        'daughter'    => 'Daughter',
+        'brother'     => 'Brother',
+        'sister'      => 'Sister',
+    ],
+    'Grandparents' => [
+        'grandfather_paternal' =>
+            'Grandfather (Father\'s side)',
+        'grandmother_paternal' =>
+            'Grandmother (Father\'s side)',
+        'grandfather_maternal' =>
+            'Grandfather (Mother\'s side)',
+        'grandmother_maternal' =>
+            'Grandmother (Mother\'s side)',
+    ],
+    'Extended Family' => [
+        'uncle'       => 'Uncle',
+        'aunt'        => 'Aunt',
+        'nephew'      => 'Nephew',
+        'niece'       => 'Niece',
+        'cousin'      => 'Cousin',
+        'great_grandfather' => 'Great Grandfather',
+        'great_grandmother' => 'Great Grandmother',
+        'stepfather'  => 'Stepfather',
+        'stepmother'  => 'Stepmother',
+        'half_brother' => 'Half Brother',
+        'half_sister'  => 'Half Sister',
+        'other'       => 'Other Relative',
+    ],
+];
+
+// Map relation to relationships table type
+$type_map = [
+    'father'               => 'parent',
+    'mother'               => 'parent',
+    'grandfather_paternal' => 'parent',
+    'grandmother_paternal' => 'parent',
+    'grandfather_maternal' => 'parent',
+    'grandmother_maternal' => 'parent',
+    'great_grandfather'    => 'parent',
+    'great_grandmother'    => 'parent',
+    'stepfather'           => 'parent',
+    'stepmother'           => 'parent',
+    'son'                  => 'child',
+    'daughter'             => 'child',
+    'nephew'               => 'child',
+    'niece'                => 'child',
+    'spouse'               => 'spouse',
+    'brother'              => 'sibling',
+    'sister'               => 'sibling',
+    'uncle'                => 'sibling',
+    'aunt'                 => 'sibling',
+    'cousin'               => 'sibling',
+    'half_brother'         => 'sibling',
+    'half_sister'          => 'sibling',
+    'other'                => 'sibling',
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // ── Collect form data ─────────────────────
     $full_name      = trim($_POST['full_name']      ?? '');
     $preferred_name = trim($_POST['preferred_name'] ?? '');
     $gender         = $_POST['gender']              ?? '';
@@ -38,32 +97,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $quarter_id     = $_POST['quarter_id']          ?? '';
     $source         = trim($_POST['source_of_info'] ?? '');
     $privacy        = $_POST['privacy']             ?? 'members';
+    $my_relation    = $_POST['my_relation']         ?? '';
 
-    // Relationship fields
-    $related_to     = $_POST['related_to']          ?? '';
-    $relation_type  = $_POST['relation_type']       ?? '';
-
-    // ── Validation ────────────────────────────
+    // Validation
     if (empty($full_name))
         $errors[] = 'Full name is required.';
-
     if (empty($quarter_id))
         $errors[] = 'Please select a quarter.';
-
     if (empty($source))
         $errors[] = 'Source of information is required.';
+    if (empty($my_relation))
+        $errors[] = 'Please select how this person
+                     is related to you.';
 
-    // Validate relationship if provided
-    if (!empty($related_to) && empty($relation_type))
-        $errors[] = 'Please select the relationship type.';
-
-    if (!empty($relation_type) && empty($related_to))
-        $errors[] = 'Please select who this person is related to.';
-
-    if (!in_array($privacy, ['public','members','private']))
-        $privacy = 'members';
-
-    // ── Handle photo upload ───────────────────
+    // Handle photo upload
     $photo_path = null;
     if (!empty($_FILES['photo']['name'])) {
         $upload = uploadFile($_FILES['photo'], 'photo');
@@ -74,25 +121,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Insert member into database ───────────
     if (empty($errors)) {
 
+        // Insert the new family member
         $stmt = $pdo->prepare("
             INSERT INTO family_members (
-                full_name,
-                preferred_name,
-                gender,
-                date_of_birth,
-                dob_approximate,
-                date_of_death,
-                dod_approximate,
-                birthplace,
-                occupation,
-                short_bio,
-                quarter_id,
-                photo,
-                source_of_info,
-                privacy,
+                full_name, preferred_name,
+                gender, date_of_birth,
+                dob_approximate, date_of_death,
+                dod_approximate, birthplace,
+                occupation, short_bio,
+                quarter_id, photo,
+                source_of_info, privacy,
                 added_by
             ) VALUES (
                 ?, ?, ?, ?, ?,
@@ -121,63 +161,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $new_member_id = $pdo->lastInsertId();
 
-        // ── Save relationship if provided ─────
-        if (!empty($related_to)
-            && !empty($relation_type)) {
+        // Save the relationship between
+        // the new member and the logged-in user
+        $db_type = $type_map[$my_relation]
+                   ?? 'sibling';
 
-            // Determine the correct direction
-            // based on relationship type
-            //
-            // If I say "John is the FATHER of Mary":
-            //   member_id_1 = John (related_to)
-            //   member_id_2 = Mary (new member)
-            //   type = parent
-            //
-            // If I say "Mary is the CHILD of John":
-            //   member_id_1 = Mary (new member)
-            //   member_id_2 = John (related_to)
-            //   type = child
-            //
-            // For spouse and sibling direction
-            // does not matter
+        saveRelationship(
+            $pdo,
+            $myMember['member_id'],
+            $new_member_id,
+            $db_type
+        );
 
-            $m1 = $new_member_id;
-            $m2 = $related_to;
-
-            // If the new member IS the child
-            // then the related person IS the parent
-            // so we also save the reverse
-            $reverse_type = [
-                'parent'  => 'child',
-                'child'   => 'parent',
-                'spouse'  => 'spouse',
-                'sibling' => 'sibling',
-            ];
-
-            // Save the stated relationship
-            $pdo->prepare("
-                INSERT INTO relationships
-                    (member_id_1,
-                     member_id_2,
-                     type)
-                VALUES (?, ?, ?)
-            ")->execute([$m1, $m2, $relation_type]);
-
-            // Save the reverse relationship
-            // so the tree works both ways
-            $pdo->prepare("
-                INSERT INTO relationships
-                    (member_id_1,
-                     member_id_2,
-                     type)
-            ")->execute([
-                $m2,
-                $m1,
-                $reverse_type[$relation_type]
-            ]);
-        }
-
-        // ── Log the action ────────────────────
+        // Store the specific relation label
+        // in audit log
         $pdo->prepare("
             INSERT INTO audit_log
                 (user_id, action,
@@ -188,17 +185,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ")->execute([
             $user['id'],
             $new_member_id,
-            'Added: ' . $full_name .
-            (!empty($related_to)
-                ? ' | Related to member #'
-                  . $related_to
-                  . ' as ' . $relation_type
-                : '')
+            'Added ' . $my_relation
+            . ': ' . $full_name
         ]);
 
-        $success       = true;
-        $success_name  = $full_name;
-        $success_id    = $new_member_id;
+        $success      = true;
+        $success_name = $full_name;
+        $success_rel  = $relation_options[
+            array_key_first(
+                array_filter(
+                    $relation_options,
+                    fn($g) => isset($g[$my_relation])
+                )
+            )
+        ][$my_relation] ?? $my_relation;
     }
 }
 
@@ -206,51 +206,69 @@ $quarters = getAllQuarters($pdo);
 ?>
 <?php require_once '../includes/header.php'; ?>
 
-<main style="padding: 2rem;">
-<div class="container" style="max-width: 760px;">
+<main style="padding:2rem">
+<div class="container" style="max-width:760px">
 
-  <!-- Page header -->
   <div class="mb-4">
     <a href="<?= SITE_URL ?>/family/tree.php"
-       style="color:#888; font-size:0.9rem">
+       style="color:#888;font-size:0.9rem">
       ← Back to Family Tree
     </a>
-    <h2 style="color:#fff; margin-top:0.75rem">
+    <h2 style="color:#fff;margin-top:0.75rem">
       Add Family Member
     </h2>
     <p style="color:#888">
-      Preserve the memory of a relative.
+      Add a relative to your family tree.
       Fields marked * are required.
     </p>
   </div>
 
-  <!-- Guidelines banner -->
+  <!-- My profile summary -->
   <div style="
-    background: rgba(0,212,255,0.08);
-    border: 1px solid rgba(0,212,255,0.2);
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.15);
     border-radius: 10px;
     padding: 1rem 1.25rem;
     margin-bottom: 1.5rem;
-    font-size: 0.88rem;
-    color: #aaa;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   ">
-    <strong style="color:#00d4ff">
-      Submission Guidelines
-    </strong><br>
-    All records are reviewed before being marked
-    as verified. Please ensure details match your
-    official documents or oral sources.
+    <div style="
+      width:42px;height:42px;
+      border-radius:50%;
+      background:#1e1e3a;
+      display:flex;align-items:center;
+      justify-content:center;
+      font-size:1.1rem;font-weight:600;
+      color:#00d4ff;flex-shrink:0;
+    ">
+      <?= strtoupper(substr($user['name'], 0, 1)) ?>
+    </div>
+    <div>
+      <div style="color:#fff;font-size:0.9rem;
+                  font-weight:500">
+        Adding relative of
+        <strong><?= clean($user['name']) ?></strong>
+      </div>
+      <div style="color:#555;font-size:0.8rem">
+        <?= clean(
+            $myMember['quarter_name'] ?? ''
+        ) ?> Quarter
+      </div>
+    </div>
   </div>
 
-  <!-- Success message -->
+  <!-- Success -->
   <?php if ($success): ?>
     <div class="alert alert-success mb-4">
       ✓ <strong><?= clean($success_name) ?></strong>
-      has been added to the family tree.
-      <br>
+      (your <?= clean($success_rel) ?>)
+      has been added to your family tree.
+      <br><br>
       <a href="<?= SITE_URL ?>/family/add.php"
          style="color:#00d4ff">
-        Add another member
+        Add another relative
       </a>
       &nbsp;·&nbsp;
       <a href="<?= SITE_URL ?>/family/tree.php"
@@ -267,37 +285,98 @@ $quarters = getAllQuarters($pdo);
     </div>
   <?php endforeach; ?>
 
-  <form method="POST"
-        action=""
+  <form method="POST" action=""
         enctype="multipart/form-data">
+
+    <!-- ── RELATIONSHIP TO ME ─────────────── -->
+    <div style="
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
+    ">
+      <div style="
+        font-size:0.75rem;font-weight:600;
+        letter-spacing:0.08em;color:#00d4ff;
+        text-transform:uppercase;
+        margin-bottom:0.5rem;
+      ">
+        Relationship to Me *
+      </div>
+      <p style="color:#666;font-size:0.82rem;
+                margin-bottom:1rem">
+        How is this person related to you?
+        This is what connects them to your
+        position in the family tree.
+      </p>
+
+      <select name="my_relation"
+              class="form-select"
+              id="my_relation"
+              style="background:#0d0d1a;
+                     border:1px solid #1e1e3a;
+                     color:#e0e0e0;border-radius:8px"
+              onchange="updatePreview()"
+              required>
+        <option value="">
+          -- How are they related to you? --
+        </option>
+        <?php foreach (
+            $relation_options as $group => $options
+        ): ?>
+          <optgroup label="<?= $group ?>">
+            <?php foreach (
+                $options as $val => $label
+            ): ?>
+              <option value="<?= $val ?>"
+                <?= ($_POST['my_relation'] ?? '')
+                    === $val ? 'selected':'' ?>>
+                <?= $label ?>
+              </option>
+            <?php endforeach; ?>
+          </optgroup>
+        <?php endforeach; ?>
+      </select>
+
+      <!-- Relationship preview -->
+      <div id="relation_preview"
+           style="
+             margin-top:0.75rem;
+             padding:0.75rem 1rem;
+             background:rgba(0,212,255,0.06);
+             border:1px solid rgba(0,212,255,0.15);
+             border-radius:8px;
+             color:#00d4ff;
+             font-size:0.85rem;
+             display:none;
+           ">
+      </div>
+    </div>
 
     <!-- ── BIOGRAPHICAL INFORMATION ───────── -->
     <div style="
-      background: #111127;
-      border: 1px solid #1e1e3a;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
     ">
       <div style="
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: #00d4ff;
-        text-transform: uppercase;
-        margin-bottom: 1.25rem;
+        font-size:0.75rem;font-weight:600;
+        letter-spacing:0.08em;color:#00d4ff;
+        text-transform:uppercase;
+        margin-bottom:1.25rem;
       ">
         Biographical Information
       </div>
 
-      <!-- Full name -->
       <div class="mb-3">
         <label style="color:#aaa;font-size:0.85rem;
                       display:block;margin-bottom:4px">
-          Full Legal Name *
+          Full Name *
         </label>
-        <input type="text"
-               name="full_name"
+        <input type="text" name="full_name"
                class="form-control"
                style="background:#0d0d1a;
                       border:1px solid #1e1e3a;
@@ -305,19 +384,19 @@ $quarters = getAllQuarters($pdo);
                value="<?= clean(
                    $_POST['full_name'] ?? ''
                ) ?>"
+               id="member_name"
                placeholder="e.g. Enow Mbong"
+               onkeyup="updatePreview()"
                required>
       </div>
 
-      <!-- Preferred name -->
       <div class="mb-3">
         <label style="color:#aaa;font-size:0.85rem;
                       display:block;margin-bottom:4px">
           Preferred / Known As
           <span style="color:#555">(optional)</span>
         </label>
-        <input type="text"
-               name="preferred_name"
+        <input type="text" name="preferred_name"
                class="form-control"
                style="background:#0d0d1a;
                       border:1px solid #1e1e3a;
@@ -328,7 +407,6 @@ $quarters = getAllQuarters($pdo);
                placeholder="Nickname or known name">
       </div>
 
-      <!-- Gender and Quarter -->
       <div class="row g-3 mb-3">
         <div class="col-md-6">
           <label style="color:#aaa;font-size:0.85rem;
@@ -338,18 +416,17 @@ $quarters = getAllQuarters($pdo);
           <select name="gender" class="form-select"
                   style="background:#0d0d1a;
                          border:1px solid #1e1e3a;
-                         color:#e0e0e0;
-                         border-radius:8px">
+                         color:#e0e0e0;border-radius:8px">
             <option value="">-- Select --</option>
             <option value="male" <?=
-                ($_POST['gender'] ?? '') === 'male'
-                ? 'selected':'' ?>>Male</option>
+                ($_POST['gender']??'')==='male'
+                ?'selected':''?>>Male</option>
             <option value="female" <?=
-                ($_POST['gender'] ?? '') === 'female'
-                ? 'selected':'' ?>>Female</option>
+                ($_POST['gender']??'')==='female'
+                ?'selected':''?>>Female</option>
             <option value="other" <?=
-                ($_POST['gender'] ?? '') === 'other'
-                ? 'selected':'' ?>>Other</option>
+                ($_POST['gender']??'')==='other'
+                ?'selected':''?>>Other</option>
           </select>
         </div>
         <div class="col-md-6">
@@ -367,28 +444,23 @@ $quarters = getAllQuarters($pdo);
             </option>
             <?php foreach ($quarters as $q): ?>
               <option value="<?= $q['quarter_id'] ?>"
-                <?= ($_POST['quarter_id'] ?? '') ==
+                <?= ($_POST['quarter_id']??'')==
                     $q['quarter_id']
-                    ? 'selected':'' ?>>
+                    ?'selected':''?>>
                 <?= clean($q['name']) ?>
               </option>
             <?php endforeach; ?>
           </select>
-          <small style="color:#555;font-size:0.78rem">
-            The founding quarter this person belongs to
-          </small>
         </div>
       </div>
 
-      <!-- Occupation -->
       <div class="mb-3">
         <label style="color:#aaa;font-size:0.85rem;
                       display:block;margin-bottom:4px">
           Occupation
           <span style="color:#555">(optional)</span>
         </label>
-        <input type="text"
-               name="occupation"
+        <input type="text" name="occupation"
                class="form-control"
                style="background:#0d0d1a;
                       border:1px solid #1e1e3a;
@@ -396,18 +468,16 @@ $quarters = getAllQuarters($pdo);
                value="<?= clean(
                    $_POST['occupation'] ?? ''
                ) ?>"
-               placeholder="e.g. Teacher, Farmer, Elder">
+               placeholder="e.g. Elder, Teacher, Farmer">
       </div>
 
-      <!-- Birthplace -->
       <div class="mb-3">
         <label style="color:#aaa;font-size:0.85rem;
                       display:block;margin-bottom:4px">
           Birthplace
           <span style="color:#555">(optional)</span>
         </label>
-        <input type="text"
-               name="birthplace"
+        <input type="text" name="birthplace"
                class="form-control"
                style="background:#0d0d1a;
                       border:1px solid #1e1e3a;
@@ -415,11 +485,9 @@ $quarters = getAllQuarters($pdo);
                value="<?= clean(
                    $_POST['birthplace'] ?? ''
                ) ?>"
-               placeholder="e.g. Ekpor Village,
-                             Manyu Division">
+               placeholder="e.g. Ekpor Village">
       </div>
 
-      <!-- Short bio -->
       <div class="mb-0">
         <label style="color:#aaa;font-size:0.85rem;
                       display:block;margin-bottom:4px">
@@ -432,177 +500,36 @@ $quarters = getAllQuarters($pdo);
                          border:1px solid #1e1e3a;
                          color:#e0e0e0;border-radius:8px;
                          min-height:90px"
-                  placeholder="Brief summary of their life,
-                    achievements, and significance..."
+                  placeholder="Brief summary of their life..."
                   ><?= clean(
                       $_POST['short_bio'] ?? ''
                   ) ?></textarea>
       </div>
     </div>
 
-    <!-- ── FAMILY CONNECTION ───────────────── -->
-    <div style="
-      background: #111127;
-      border: 1px solid #1e1e3a;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-    ">
-      <div style="
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: #00d4ff;
-        text-transform: uppercase;
-        margin-bottom: 0.5rem;
-      ">
-        Family Connection
-      </div>
-
-      <p style="color:#666;font-size:0.82rem;
-                margin-bottom:1rem">
-        Link this person to an existing member
-        of the family tree. This is how the tree
-        draws the connection between people.
-        Leave blank if this is the first member
-        or if the connection is unknown.
-      </p>
-
-      <?php if (empty($existing_members)): ?>
-        <div style="color:#555;font-size:0.85rem;
-                    font-style:italic">
-          No existing members yet — this will be
-          the first person in the tree.
-        </div>
-      <?php else: ?>
-
-      <div class="row g-3">
-
-        <!-- Who are they related to -->
-        <div class="col-md-6">
-          <label style="color:#aaa;font-size:0.85rem;
-                        display:block;margin-bottom:4px">
-            Related to
-          </label>
-          <select name="related_to"
-                  class="form-select"
-                  id="related_to"
-                  style="background:#0d0d1a;
-                         border:1px solid #1e1e3a;
-                         color:#e0e0e0;border-radius:8px"
-                  onchange="updateRelationLabel()">
-            <option value="">
-              -- Select existing member --
-            </option>
-            <?php foreach (
-                $existing_members as $m
-            ): ?>
-              <option
-                value="<?= $m['member_id'] ?>"
-                data-name="<?= clean(
-                    $m['full_name']
-                ) ?>"
-                <?= ($_POST['related_to'] ?? '') ==
-                    $m['member_id']
-                    ? 'selected':'' ?>>
-                <?= clean($m['full_name']) ?>
-                (<?= clean($m['quarter_name']) ?>)
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-
-        <!-- Relationship type -->
-        <div class="col-md-6">
-          <label style="color:#aaa;font-size:0.85rem;
-                        display:block;margin-bottom:4px"
-                 id="relation_label">
-            Relationship Type
-          </label>
-          <select name="relation_type"
-                  class="form-select"
-                  id="relation_type"
-                  style="background:#0d0d1a;
-                         border:1px solid #1e1e3a;
-                         color:#e0e0e0;border-radius:8px"
-                  onchange="updateRelationLabel()">
-            <option value="">
-              -- Select relationship --
-            </option>
-            <option value="parent" <?=
-                ($_POST['relation_type'] ?? '')
-                === 'parent' ? 'selected':'' ?>>
-              Parent
-              (this person IS the parent of
-               the selected member)
-            </option>
-            <option value="child" <?=
-                ($_POST['relation_type'] ?? '')
-                === 'child' ? 'selected':'' ?>>
-              Child
-              (this person IS the child of
-               the selected member)
-            </option>
-            <option value="spouse" <?=
-                ($_POST['relation_type'] ?? '')
-                === 'spouse' ? 'selected':'' ?>>
-              Spouse / Partner
-            </option>
-            <option value="sibling" <?=
-                ($_POST['relation_type'] ?? '')
-                === 'sibling' ? 'selected':'' ?>>
-              Sibling
-              (brother or sister)
-            </option>
-          </select>
-        </div>
-
-      </div>
-
-      <!-- Plain English preview of the relationship -->
-      <div id="relation_preview"
-           style="
-             margin-top: 0.75rem;
-             padding: 0.75rem 1rem;
-             background: rgba(0,212,255,0.06);
-             border: 1px solid rgba(0,212,255,0.15);
-             border-radius: 8px;
-             color: #00d4ff;
-             font-size: 0.85rem;
-             display: none;
-           ">
-      </div>
-
-      <?php endif; ?>
-    </div>
-
     <!-- ── LIFE TIMELINE ───────────────────── -->
     <div style="
-      background: #111127;
-      border: 1px solid #1e1e3a;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
     ">
       <div style="
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: #00d4ff;
-        text-transform: uppercase;
-        margin-bottom: 1.25rem;
+        font-size:0.75rem;font-weight:600;
+        letter-spacing:0.08em;color:#00d4ff;
+        text-transform:uppercase;
+        margin-bottom:1.25rem;
       ">
         Life Timeline
       </div>
-
       <div class="row g-3">
         <div class="col-md-6">
           <label style="color:#aaa;font-size:0.85rem;
                         display:block;margin-bottom:4px">
             Date of Birth
           </label>
-          <input type="date"
-                 name="date_of_birth"
+          <input type="date" name="date_of_birth"
                  class="form-control"
                  style="background:#0d0d1a;
                         border:1px solid #1e1e3a;
@@ -616,7 +543,7 @@ $quarters = getAllQuarters($pdo);
                    class="form-check-input"
                    id="dob_approx"
                    <?= isset($_POST['dob_approximate'])
-                       ? 'checked':'' ?>>
+                       ?'checked':''?>>
             <label class="form-check-label"
                    for="dob_approx"
                    style="color:#555;font-size:0.8rem">
@@ -632,8 +559,7 @@ $quarters = getAllQuarters($pdo);
               (if deceased)
             </span>
           </label>
-          <input type="date"
-                 name="date_of_death"
+          <input type="date" name="date_of_death"
                  class="form-control"
                  style="background:#0d0d1a;
                         border:1px solid #1e1e3a;
@@ -647,7 +573,7 @@ $quarters = getAllQuarters($pdo);
                    class="form-check-input"
                    id="dod_approx"
                    <?= isset($_POST['dod_approximate'])
-                       ? 'checked':'' ?>>
+                       ?'checked':''?>>
             <label class="form-check-label"
                    for="dod_approx"
                    style="color:#555;font-size:0.8rem">
@@ -660,19 +586,17 @@ $quarters = getAllQuarters($pdo);
 
     <!-- ── PHOTO ───────────────────────────── -->
     <div style="
-      background: #111127;
-      border: 1px solid #1e1e3a;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
     ">
       <div style="
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: #00d4ff;
-        text-transform: uppercase;
-        margin-bottom: 1rem;
+        font-size:0.75rem;font-weight:600;
+        letter-spacing:0.08em;color:#00d4ff;
+        text-transform:uppercase;
+        margin-bottom:1rem;
       ">
         Photo
         <span style="color:#555;
@@ -683,13 +607,10 @@ $quarters = getAllQuarters($pdo);
           optional
         </span>
       </div>
-
       <div style="
-        border: 2px dashed #1e1e3a;
-        border-radius: 10px;
-        padding: 1.5rem;
-        text-align: center;
-        color: #555;
+        border:2px dashed #1e1e3a;
+        border-radius:10px;padding:1.5rem;
+        text-align:center;color:#555;
       ">
         <i class="ti ti-camera"
            style="font-size:1.8rem;
@@ -701,14 +622,12 @@ $quarters = getAllQuarters($pdo);
                       font-size:0.9rem">
           Click to upload a photo
         </label>
-        <input type="file"
-               name="photo"
+        <input type="file" name="photo"
                id="photo_upload"
                accept="image/jpeg,image/png,image/webp"
                style="display:none"
                onchange="showFileName(this)">
-        <p style="margin-top:0.4rem;
-                  font-size:0.78rem">
+        <p style="margin-top:0.4rem;font-size:0.78rem">
           PNG, JPG or WebP — max 10MB
         </p>
         <p id="file-name"
@@ -719,33 +638,29 @@ $quarters = getAllQuarters($pdo);
 
     <!-- ── PROVENANCE ──────────────────────── -->
     <div style="
-      background: #111127;
-      border: 1px solid #1e1e3a;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
     ">
       <div style="
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: #00d4ff;
-        text-transform: uppercase;
-        margin-bottom: 0.4rem;
+        font-size:0.75rem;font-weight:600;
+        letter-spacing:0.08em;color:#00d4ff;
+        text-transform:uppercase;
+        margin-bottom:0.4rem;
       ">
         Provenance
       </div>
       <p style="color:#666;font-size:0.82rem;
                 margin-bottom:1rem">
         Where did this information come from?
-        This helps verify the record.
       </p>
       <label style="color:#aaa;font-size:0.85rem;
                     display:block;margin-bottom:4px">
         Source of Information *
       </label>
-      <input type="text"
-             name="source_of_info"
+      <input type="text" name="source_of_info"
              class="form-control"
              style="background:#0d0d1a;
                     border:1px solid #1e1e3a;
@@ -753,26 +668,25 @@ $quarters = getAllQuarters($pdo);
              value="<?= clean(
                  $_POST['source_of_info'] ?? ''
              ) ?>"
-             placeholder="e.g. Family Bible, Oral account
-               from elder, Personal recall, Census record"
+             placeholder="e.g. Family Bible,
+               Oral account from elder,
+               Personal knowledge"
              required>
     </div>
 
     <!-- ── PRIVACY ─────────────────────────── -->
     <div style="
-      background: #111127;
-      border: 1px solid #1e1e3a;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
     ">
       <div style="
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: #00d4ff;
-        text-transform: uppercase;
-        margin-bottom: 1rem;
+        font-size:0.75rem;font-weight:600;
+        letter-spacing:0.08em;color:#00d4ff;
+        text-transform:uppercase;
+        margin-bottom:1rem;
       ">
         Privacy
       </div>
@@ -780,9 +694,8 @@ $quarters = getAllQuarters($pdo);
         <label style="cursor:pointer">
           <input type="radio" name="privacy"
                  value="public"
-                 <?= ($_POST['privacy'] ?? 'members')
-                     === 'public'
-                     ? 'checked':'' ?>>
+                 <?= ($_POST['privacy']??'members')
+                     ==='public'?'checked':''?>>
           <span style="color:#aaa;font-size:0.9rem;
                        margin-left:6px">Public</span>
           <small style="display:block;color:#555;
@@ -794,9 +707,8 @@ $quarters = getAllQuarters($pdo);
         <label style="cursor:pointer">
           <input type="radio" name="privacy"
                  value="members"
-                 <?= ($_POST['privacy'] ?? 'members')
-                     === 'members'
-                     ? 'checked':'' ?>>
+                 <?= ($_POST['privacy']??'members')
+                     ==='members'?'checked':''?>>
           <span style="color:#aaa;font-size:0.9rem;
                        margin-left:6px">
             Members Only
@@ -810,9 +722,8 @@ $quarters = getAllQuarters($pdo);
         <label style="cursor:pointer">
           <input type="radio" name="privacy"
                  value="private"
-                 <?= ($_POST['privacy'] ?? 'members')
-                     === 'private'
-                     ? 'checked':'' ?>>
+                 <?= ($_POST['privacy']??'members')
+                     ==='private'?'checked':''?>>
           <span style="color:#aaa;font-size:0.9rem;
                        margin-left:6px">Private</span>
           <small style="display:block;color:#555;
@@ -834,9 +745,7 @@ $quarters = getAllQuarters($pdo);
                for="certify"
                style="color:#888;font-size:0.85rem">
           I certify that this information is accurate
-          to the best of my knowledge and is provided
-          with respect to the deceased and
-          their living family.
+          to the best of my knowledge.
         </label>
       </div>
     </div>
@@ -846,7 +755,7 @@ $quarters = getAllQuarters($pdo);
       <button type="submit"
               class="btn btn-primary px-4">
         <i class="ti ti-user-plus me-2"></i>
-        Add to Family Tree
+        Add to My Family Tree
       </button>
       <a href="<?= SITE_URL ?>/family/tree.php"
          class="btn btn-outline-secondary px-4">
@@ -856,24 +765,24 @@ $quarters = getAllQuarters($pdo);
 
     <!-- Contributing as -->
     <div style="
-      background: #0d0d1a;
-      border: 1px solid #1e1e3a;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 0.85rem;
-      color: #888;
-      margin-bottom: 3rem;
+      background:#0d0d1a;
+      border:1px solid #1e1e3a;
+      border-radius:8px;
+      padding:0.75rem 1rem;
+      display:flex;align-items:center;
+      gap:0.75rem;font-size:0.85rem;
+      color:#888;margin-bottom:3rem;
     ">
       <i class="ti ti-user-circle"
-         style="font-size:1.5rem;color:#00d4ff"></i>
+         style="font-size:1.5rem;
+                color:#00d4ff"></i>
       <div>
         <strong style="color:#aaa">
-          Contributing as <?= clean($user['name']) ?>
+          Adding to
+          <?= clean($user['name']) ?>'s family tree
         </strong><br>
-        Your account will be linked to this record.
+        This relative will be linked directly
+        to your position in the tree.
       </div>
     </div>
 
@@ -882,59 +791,63 @@ $quarters = getAllQuarters($pdo);
 </main>
 
 <script>
-function showFileName(input) {
-    const label = document.getElementById('file-name');
-    if (input.files && input.files[0]) {
-        label.textContent = '✓ ' + input.files[0].name;
-    }
-}
+const relationLabels = {
+    father:               'Father',
+    mother:               'Mother',
+    spouse:               'Spouse / Partner',
+    son:                  'Son',
+    daughter:             'Daughter',
+    brother:              'Brother',
+    sister:               'Sister',
+    grandfather_paternal: 'Grandfather (Father\'s side)',
+    grandmother_paternal: 'Grandmother (Father\'s side)',
+    grandfather_maternal: 'Grandfather (Mother\'s side)',
+    grandmother_maternal: 'Grandmother (Mother\'s side)',
+    uncle:                'Uncle',
+    aunt:                 'Aunt',
+    nephew:               'Nephew',
+    niece:                'Niece',
+    cousin:               'Cousin',
+    great_grandfather:    'Great Grandfather',
+    great_grandmother:    'Great Grandmother',
+    stepfather:           'Stepfather',
+    stepmother:           'Stepmother',
+    half_brother:         'Half Brother',
+    half_sister:          'Half Sister',
+    other:                'Other Relative',
+};
 
-function updateRelationLabel() {
-    const relatedSelect =
-        document.getElementById('related_to');
-    const typeSelect =
-        document.getElementById('relation_type');
+function updatePreview() {
+    const nameInput =
+        document.getElementById('member_name');
+    const relationSelect =
+        document.getElementById('my_relation');
     const preview =
         document.getElementById('relation_preview');
 
-    const selectedOption =
-        relatedSelect.options[relatedSelect.selectedIndex];
-    const relatedName =
-        selectedOption
-            ? selectedOption.getAttribute('data-name')
-            : '';
-    const relType = typeSelect.value;
+    const name = nameInput.value.trim()
+                 || 'This person';
+    const rel  = relationSelect.value;
+    const label = relationLabels[rel];
 
-    // Get the new member's name from the input
-    const newName =
-        document.querySelector(
-            'input[name="full_name"]'
-        ).value.trim() || 'This person';
-
-    if (!relatedName || !relType) {
+    if (!rel || !label) {
         preview.style.display = 'none';
         return;
     }
 
-    // Build a plain English sentence
-    const sentences = {
-        parent:  `${newName} is a parent of ${relatedName}`,
-        child:   `${newName} is a child of ${relatedName}`,
-        spouse:  `${newName} is the spouse / partner of ${relatedName}`,
-        sibling: `${newName} is a sibling of ${relatedName}`,
-    };
-
-    const sentence = sentences[relType];
-    if (sentence) {
-        preview.textContent = '→  ' + sentence;
-        preview.style.display = 'block';
-    }
+    preview.textContent =
+        '→  ' + name + ' is your ' + label;
+    preview.style.display = 'block';
 }
 
-// Update preview when name changes too
-document.querySelector(
-    'input[name="full_name"]'
-).addEventListener('input', updateRelationLabel);
+function showFileName(input) {
+    const label =
+        document.getElementById('file-name');
+    if (input.files && input.files[0]) {
+        label.textContent =
+            '✓ ' + input.files[0].name;
+    }
+}
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

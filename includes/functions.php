@@ -18,6 +18,12 @@ function formatDate($date) {
     return date('F j, Y', strtotime($date));
 }
 
+// Format year only
+function formatYear($date) {
+    if (!$date) return '?';
+    return date('Y', strtotime($date));
+}
+
 // Get quarter name by ID
 function getQuarterName($pdo, $quarter_id) {
     $stmt = $pdo->prepare(
@@ -47,22 +53,129 @@ function unreadCount($pdo, $user_id) {
     return $stmt->fetchColumn();
 }
 
-// Check if two users are connected
-function areConnected($pdo, $uid1, $uid2) {
+// Check if user has completed their profile
+// (i.e. has a family_members record linked)
+function hasProfile($pdo, $user_id) {
+    $stmt = $pdo->prepare(
+        "SELECT member_id FROM users
+         WHERE user_id = ?
+         AND member_id IS NOT NULL"
+    );
+    $stmt->execute([$user_id]);
+    return $stmt->fetchColumn() !== false;
+}
+
+// Get the family member record linked
+// to a user account
+function getUserMember($pdo, $user_id) {
     $stmt = $pdo->prepare("
-        SELECT COUNT(*)
-        FROM relationships r
-        JOIN family_members m1
-          ON r.member_id_1 = m1.member_id
-        JOIN family_members m2
-          ON r.member_id_2 = m2.member_id
-        WHERE
-          (m1.added_by = ? AND m2.added_by = ?)
-          OR
-          (m1.added_by = ? AND m2.added_by = ?)
+        SELECT fm.*, q.name AS quarter_name
+        FROM users u
+        JOIN family_members fm
+          ON u.member_id = fm.member_id
+        LEFT JOIN quarters q
+          ON fm.quarter_id = q.quarter_id
+        WHERE u.user_id = ?
     ");
-    $stmt->execute([$uid1,$uid2,$uid2,$uid1]);
-    return $stmt->fetchColumn() > 0;
+    $stmt->execute([$user_id]);
+    return $stmt->fetch();
+}
+
+// Get all family members connected to a node
+function getConnections($pdo, $member_id) {
+    $stmt = $pdo->prepare("
+        SELECT
+            fm.*,
+            q.name AS quarter_name,
+            r.type AS relation_type
+        FROM relationships r
+        JOIN family_members fm
+          ON (r.member_id_2 = fm.member_id
+              AND r.member_id_1 = ?)
+          OR (r.member_id_1 = fm.member_id
+              AND r.member_id_2 = ?)
+        LEFT JOIN quarters q
+          ON fm.quarter_id = q.quarter_id
+        WHERE fm.member_id != ?
+    ");
+    $stmt->execute([
+        $member_id,
+        $member_id,
+        $member_id
+    ]);
+    return $stmt->fetchAll();
+}
+
+// Get all members added by a user
+// plus their own node
+function getUserTree($pdo, $user_id) {
+    $stmt = $pdo->prepare("
+        SELECT
+            fm.*,
+            q.name AS quarter_name
+        FROM family_members fm
+        LEFT JOIN quarters q
+          ON fm.quarter_id = q.quarter_id
+        LEFT JOIN users u
+          ON u.member_id = fm.member_id
+        WHERE fm.added_by = ?
+           OR u.user_id = ?
+        ORDER BY fm.created_at ASC
+    ");
+    $stmt->execute([$user_id, $user_id]);
+    return $stmt->fetchAll();
+}
+
+// Save a relationship between two members
+function saveRelationship(
+    $pdo, $member_id_1,
+    $member_id_2, $type
+) {
+    // Check it does not already exist
+    $check = $pdo->prepare("
+        SELECT relationship_id
+        FROM relationships
+        WHERE (member_id_1 = ?
+               AND member_id_2 = ?
+               AND type = ?)
+           OR (member_id_1 = ?
+               AND member_id_2 = ?
+               AND type = ?)
+    ");
+
+    $reverse = [
+        'parent'  => 'child',
+        'child'   => 'parent',
+        'spouse'  => 'spouse',
+        'sibling' => 'sibling',
+    ];
+
+    $reverse_type = $reverse[$type] ?? $type;
+
+    $check->execute([
+        $member_id_1, $member_id_2, $type,
+        $member_id_2, $member_id_1, $reverse_type,
+    ]);
+
+    if ($check->fetch()) return; // already exists
+
+    // Save forward relationship
+    $pdo->prepare("
+        INSERT INTO relationships
+            (member_id_1, member_id_2, type)
+        VALUES (?, ?, ?)
+    ")->execute([$member_id_1, $member_id_2, $type]);
+
+    // Save reverse relationship
+    $pdo->prepare("
+        INSERT INTO relationships
+            (member_id_1, member_id_2, type)
+        VALUES (?, ?, ?)
+    ")->execute([
+        $member_id_2,
+        $member_id_1,
+        $reverse_type
+    ]);
 }
 
 // Handle file upload
@@ -107,7 +220,8 @@ function uploadFile($file, $type) {
     }
 
     return [
-        'path'     => 'uploads/' . $type . 's/' . $filename,
+        'path'     => 'uploads/' . $type
+                      . 's/' . $filename,
         'filename' => $filename,
         'size'     => $file['size'],
         'mime'     => $file['type'],
