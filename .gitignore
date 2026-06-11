@@ -13,13 +13,36 @@ uploads/audio/*
 
 # OS files
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
+ehthumbs.db
 Desktop.ini
 
 # Editor files
 .vscode/
 .idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
 
 # PHP logs
 *.log
 error_log
+php_errorlog
+
+# XAMPP local config
+php.ini
+my.ini
+.env
+
+# Node
+node_modules/
+npm-debug.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
