@@ -86,7 +86,11 @@ function getConnections($pdo, $member_id) {
     $stmt = $pdo->prepare("
         SELECT
             fm.*,
-            q.name AS quarter_name,
+            COALESCE(
+                q.name,
+                fm.village_of_origin,
+                'Unknown Village'
+            ) AS quarter_name,
             r.type AS relation_type
         FROM relationships r
         JOIN family_members fm
@@ -106,20 +110,23 @@ function getConnections($pdo, $member_id) {
     return $stmt->fetchAll();
 }
 
-// Get all members added by a user
-// plus their own node
+// Get all members in a user's tree
 function getUserTree($pdo, $user_id) {
     $stmt = $pdo->prepare("
         SELECT
             fm.*,
-            q.name AS quarter_name
+            COALESCE(
+                q.name,
+                fm.village_of_origin,
+                'Unknown Village'
+            ) AS quarter_name
         FROM family_members fm
         LEFT JOIN quarters q
           ON fm.quarter_id = q.quarter_id
         LEFT JOIN users u
           ON u.member_id = fm.member_id
         WHERE fm.added_by = ?
-           OR u.user_id = ?
+           OR u.user_id  = ?
         ORDER BY fm.created_at ASC
     ");
     $stmt->execute([$user_id, $user_id]);
