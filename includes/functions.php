@@ -221,46 +221,348 @@ function saveRelationship(
         'half_sister'          => 'sibling',
         'cousin'               => 'cousin',
         'other'                => 'relative',
+        // reverse labels
+        'son_or_daughter'      => 'father_or_mother',
+        'father_or_mother'     => 'son_or_daughter',
+        'grandchild'           => 'grandparent',
+        'great_grandchild'     => 'great_grandparent',
+        'stepchild'            => 'stepparent',
+        'uncle_or_aunt'        => 'nephew_or_niece',
+        'nephew_or_niece'      => 'uncle_or_aunt',
+        'sibling'              => 'sibling',
+        'cousin'               => 'cousin',
+        'relative'             => 'relative',
     ];
 
     $r_type  = $reverse_type[$type]   ?? $type;
     $r_label = $reverse_labels[$label] ?? $r_type;
 
-    // Check it does not already exist
+    // ── Save the direct relationship ──────────
+    insertRelationshipIfNotExists(
+        $pdo,
+        $member_id_1, $member_id_2,
+        $type, $label
+    );
+
+    insertRelationshipIfNotExists(
+        $pdo,
+        $member_id_2, $member_id_1,
+        $r_type, $r_label
+    );
+
+    // ── Auto-infer chain relationships ────────
+    // member_id_1 is always the ROOT user's node
+    // member_id_2 is the new member being added
+    autoInferRelationships(
+        $pdo,
+        $member_id_1, $member_id_2,
+        $type, $label
+    );
+}
+
+// ── Insert only if not already exists ─────────
+function insertRelationshipIfNotExists(
+    $pdo, $m1, $m2, $type, $label
+) {
     $check = $pdo->prepare("
         SELECT relationship_id
         FROM relationships
         WHERE member_id_1 = ?
-        AND member_id_2   = ?
+        AND   member_id_2 = ?
     ");
-    $check->execute([$member_id_1, $member_id_2]);
+    $check->execute([$m1, $m2]);
     if ($check->fetch()) return;
 
-    // Save forward
     $pdo->prepare("
         INSERT INTO relationships
             (member_id_1, member_id_2,
              type, relation_label)
         VALUES (?, ?, ?, ?)
-    ")->execute([
-        $member_id_1,
-        $member_id_2,
-        $type,
-        $label,
-    ]);
+    ")->execute([$m1, $m2, $type, $label]);
+}
 
-    // Save reverse
-    $pdo->prepare("
-        INSERT INTO relationships
-            (member_id_1, member_id_2,
-             type, relation_label)
-        VALUES (?, ?, ?, ?)
-    ")->execute([
-        $member_id_2,
-        $member_id_1,
-        $r_type,
-        $r_label,
-    ]);
+// ── Auto-infer missing chain links ────────────
+function autoInferRelationships(
+    $pdo, $root_id, $new_member_id,
+    $type, $label
+) {
+    // Rules: given what we know about
+    // the new member's relation to root,
+    // find other existing members and
+    // create the missing links between them
+
+    // ── Grandparent rules ─────────────────────
+    // If new member is a grandfather/grandmother,
+    // find the matching parent and connect them
+    $grandparent_labels = [
+        'grandfather_paternal',
+        'grandmother_paternal',
+    ];
+    $maternal_labels = [
+        'grandfather_maternal',
+        'grandmother_maternal',
+    ];
+
+    if (in_array($label, $grandparent_labels)) {
+        // Find root's father
+        $parent = findRelativeByLabel(
+            $pdo, $root_id, 'father'
+        );
+        if ($parent) {
+            // New grandparent is parent's parent
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $parent,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $parent, $new_member_id,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+
+    if (in_array($label, $maternal_labels)) {
+        // Find root's mother
+        $parent = findRelativeByLabel(
+            $pdo, $root_id, 'mother'
+        );
+        if ($parent) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $parent,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $parent, $new_member_id,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+
+    // ── Father/Mother rules ───────────────────
+    // If new member is father, find existing
+    // paternal grandparents and connect them
+    if ($label === 'father') {
+        $gf = findRelativeByLabel(
+            $pdo, $root_id,
+            'grandfather_paternal'
+        );
+        if ($gf) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $gf, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $gf,
+                'child', 'son_or_daughter'
+            );
+        }
+        $gm = findRelativeByLabel(
+            $pdo, $root_id,
+            'grandmother_paternal'
+        );
+        if ($gm) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $gm, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $gm,
+                'child', 'son_or_daughter'
+            );
+        }
+
+        // Also find root's siblings and
+        // connect them to new father too
+        $siblings = findRelativesByType(
+            $pdo, $root_id, 'sibling'
+        );
+        foreach ($siblings as $sib) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $sib,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $sib, $new_member_id,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+
+    if ($label === 'mother') {
+        $gf = findRelativeByLabel(
+            $pdo, $root_id,
+            'grandfather_maternal'
+        );
+        if ($gf) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $gf, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $gf,
+                'child', 'son_or_daughter'
+            );
+        }
+        $gm = findRelativeByLabel(
+            $pdo, $root_id,
+            'grandmother_maternal'
+        );
+        if ($gm) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $gm, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $gm,
+                'child', 'son_or_daughter'
+            );
+        }
+
+        // Siblings → mother
+        $siblings = findRelativesByType(
+            $pdo, $root_id, 'sibling'
+        );
+        foreach ($siblings as $sib) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $sib,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $sib, $new_member_id,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+
+    // ── Sibling rules ─────────────────────────
+    // If new member is a sibling,
+    // connect them to existing parents
+    if (in_array($label, [
+        'brother', 'sister',
+        'half_brother', 'half_sister'
+    ])) {
+        $father = findRelativeByLabel(
+            $pdo, $root_id, 'father'
+        );
+        if ($father) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $father, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $father,
+                'child', 'son_or_daughter'
+            );
+        }
+
+        $mother = findRelativeByLabel(
+            $pdo, $root_id, 'mother'
+        );
+        if ($mother) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $mother, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $mother,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+
+    // ── Spouse rules ──────────────────────────
+    // If new member is spouse, connect
+    // them to root's children as parent
+    if ($label === 'spouse') {
+        $children = findRelativesByType(
+            $pdo, $root_id, 'child'
+        );
+        foreach ($children as $child) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $child,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $child, $new_member_id,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+
+    // ── Son/Daughter rules ────────────────────
+    // If new member is a child,
+    // connect them to existing spouse
+    if (in_array($label, ['son', 'daughter'])) {
+        $spouse = findRelativeByLabel(
+            $pdo, $root_id, 'spouse'
+        );
+        if ($spouse) {
+            insertRelationshipIfNotExists(
+                $pdo,
+                $spouse, $new_member_id,
+                'parent', 'father_or_mother'
+            );
+            insertRelationshipIfNotExists(
+                $pdo,
+                $new_member_id, $spouse,
+                'child', 'son_or_daughter'
+            );
+        }
+    }
+}
+
+// ── Helper: find a relative by specific label ─
+function findRelativeByLabel(
+    $pdo, $root_id, $label
+) {
+    $stmt = $pdo->prepare("
+        SELECT member_id_2
+        FROM relationships
+        WHERE member_id_1    = ?
+        AND   relation_label = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$root_id, $label]);
+    $row = $stmt->fetch();
+    return $row ? (int)$row['member_id_2'] : null;
+}
+
+// ── Helper: find relatives by type ────────────
+function findRelativesByType(
+    $pdo, $root_id, $type
+) {
+    $stmt = $pdo->prepare("
+        SELECT member_id_2
+        FROM relationships
+        WHERE member_id_1 = ?
+        AND   type        = ?
+    ");
+    $stmt->execute([$root_id, $type]);
+    return array_column(
+        $stmt->fetchAll(), 'member_id_2'
+    );
 }
 
 // ── File upload ───────────────────────────────
