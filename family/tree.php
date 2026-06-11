@@ -18,6 +18,11 @@ $myMember = getUserMember($pdo, $user['id']);
 <?php require_once '../includes/header.php'; ?>
 
 <style>
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
 * { box-sizing: border-box; }
 
 #tree-page {
@@ -82,7 +87,6 @@ $myMember = getUserMember($pdo, $user['id']);
     stroke: #4a90d9;
     stroke-width: 2;
     fill: none;
-    opacity: 0.7;
 }
 
 .link-spouse {
@@ -90,7 +94,6 @@ $myMember = getUserMember($pdo, $user['id']);
     stroke-width: 1.5;
     fill: none;
     stroke-dasharray: 6,3;
-    opacity: 0.6;
 }
 
 .link-sibling {
@@ -98,12 +101,9 @@ $myMember = getUserMember($pdo, $user['id']);
     stroke-width: 1.5;
     fill: none;
     stroke-dasharray: 3,4;
-    opacity: 0.5;
 }
 
-.node-card {
-    cursor: pointer;
-}
+.node-card { cursor: pointer; }
 
 .node-card .card-bg {
     transition: filter 0.15s;
@@ -111,10 +111,6 @@ $myMember = getUserMember($pdo, $user['id']);
 
 .node-card:hover .card-bg {
     filter: brightness(1.3);
-}
-
-.node-card.selected .card-bg {
-    filter: brightness(1.5);
 }
 
 #zoom-controls {
@@ -221,7 +217,6 @@ $myMember = getUserMember($pdo, $user['id']);
     display: none;
 }
 
-/* Pan hint */
 #pan-hint {
     position: absolute;
     bottom: 1.5rem;
@@ -257,6 +252,60 @@ $myMember = getUserMember($pdo, $user['id']);
             <i class="ti ti-info-circle"></i>
             Legend
         </button>
+
+        <!-- Search -->
+        <div style="position:relative">
+            <div style="
+                display:flex;align-items:center;
+                background:rgba(17,17,39,0.95);
+                border:1px solid #1e1e3a;
+                border-radius:8px;
+                padding:0 0.75rem;
+                backdrop-filter:blur(8px);
+                transition:border-color 0.2s;
+            " id="search-wrapper">
+                <i class="ti ti-search"
+                   style="color:#555;font-size:0.85rem;
+                          margin-right:6px;
+                          flex-shrink:0"></i>
+                <input type="text"
+                       id="tree-search"
+                       placeholder="Search community members..."
+                       style="
+                           background:transparent;
+                           border:none;outline:none;
+                           color:#e0e0e0;
+                           font-size:0.82rem;
+                           padding:0.45rem 0;
+                           width:220px;
+                       "
+                       oninput="onSearchInput(this.value)"
+                       onkeydown="onSearchKey(event)">
+                <button onclick="clearSearch()"
+                        id="search-clear"
+                        style="
+                            background:none;border:none;
+                            color:#555;cursor:pointer;
+                            font-size:0.9rem;padding:0;
+                            margin-left:4px;display:none;
+                        ">×</button>
+            </div>
+            <div id="search-results"
+                 style="
+                     display:none;
+                     position:absolute;
+                     top:calc(100% + 6px);left:0;
+                     width:340px;
+                     background:#111127;
+                     border:1px solid #1e1e3a;
+                     border-radius:10px;
+                     box-shadow:0 8px 32px rgba(0,0,0,0.6);
+                     z-index:500;
+                     max-height:420px;
+                     overflow-y:auto;
+                 ">
+            </div>
+        </div>
     </div>
 
     <svg id="tree-svg">
@@ -264,54 +313,40 @@ $myMember = getUserMember($pdo, $user['id']);
     </svg>
 
     <div id="zoom-controls">
-        <button class="zoom-btn"
-                onclick="zoomIn()">+</button>
-        <button class="zoom-btn"
-                onclick="zoomOut()">−</button>
-        <button class="zoom-btn"
-                onclick="resetView()"
-                title="Reset view"
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <button class="zoom-btn" onclick="zoomOut()">−</button>
+        <button class="zoom-btn" onclick="resetView()"
                 style="font-size:0.85rem">↺</button>
     </div>
 
     <div id="tree-legend">
         <div style="color:#aaa;font-size:0.72rem;
-                    font-weight:600;
-                    text-transform:uppercase;
-                    letter-spacing:0.06em;
-                    margin-bottom:0.6rem">
+                    font-weight:600;text-transform:uppercase;
+                    letter-spacing:0.06em;margin-bottom:0.6rem">
             Legend
         </div>
         <div class="legend-row">
-            <div style="width:14px;height:14px;
-                        border-radius:3px;
-                        background:#0d1a3e;
-                        border:2px solid #00d4ff">
+            <div style="width:14px;height:14px;border-radius:3px;
+                        background:#0d1a3e;border:2px solid #00d4ff">
             </div>You (root)
         </div>
         <div class="legend-row">
-            <div style="width:14px;height:14px;
-                        border-radius:3px;
-                        background:#0d1526;
-                        border:2px solid #4a90d9">
+            <div style="width:14px;height:14px;border-radius:3px;
+                        background:#0d1526;border:2px solid #4a90d9">
             </div>Male
         </div>
         <div class="legend-row">
-            <div style="width:14px;height:14px;
-                        border-radius:3px;
-                        background:#1a0d1a;
-                        border:2px solid #d94a8a">
+            <div style="width:14px;height:14px;border-radius:3px;
+                        background:#1a0d1a;border:2px solid #d94a8a">
             </div>Female
         </div>
         <div class="legend-row">
-            <div style="width:14px;height:14px;
-                        border-radius:3px;
-                        background:#111;
-                        border:2px dashed #555">
+            <div style="width:14px;height:14px;border-radius:3px;
+                        background:#111;border:2px dashed #555">
             </div>Deceased
         </div>
-        <div style="border-top:1px solid #1e1e3a;
-                    margin:0.5rem 0"></div>
+        <div style="border-top:1px solid #1e1e3a;margin:0.5rem 0">
+        </div>
         <div class="legend-row">
             <div style="width:22px;height:2px;
                         background:#4a90d9"></div>
@@ -334,8 +369,7 @@ $myMember = getUserMember($pdo, $user['id']);
     </div>
 
     <div id="detail-panel">
-        <button id="panel-close"
-                onclick="closePanel()">
+        <button id="panel-close" onclick="closePanel()">
             <i class="ti ti-x"></i>
         </button>
         <div id="panel-content"></div>
@@ -348,19 +382,15 @@ $myMember = getUserMember($pdo, $user['id']);
     <div id="empty-state">
         <i class="ti ti-git-fork"
            style="font-size:3rem;display:block;
-                  margin-bottom:1rem;color:#1e1e3a">
-        </i>
+                  margin-bottom:1rem;color:#1e1e3a"></i>
         <h4 style="color:#555;margin-bottom:0.5rem">
             No family members yet
         </h4>
         <a href="<?= SITE_URL ?>/family/add.php"
            style="background:#00d4ff;color:#000;
-                  padding:0.5rem 1.25rem;
-                  border-radius:8px;
-                  font-weight:600;
-                  text-decoration:none;
-                  font-size:0.9rem;
-                  margin-top:0.5rem;
+                  padding:0.5rem 1.25rem;border-radius:8px;
+                  font-weight:600;text-decoration:none;
+                  font-size:0.9rem;margin-top:0.5rem;
                   display:inline-block">
             Add First Member
         </a>
@@ -374,24 +404,23 @@ $myMember = getUserMember($pdo, $user['id']);
 const SITE_URL = '<?= SITE_URL ?>';
 const ROOT_ID  = <?= $myMember['member_id'] ?>;
 
-// Card dimensions
-const CW = 155;  // card width
-const CH = 72;   // card height
-const GH = 160;  // vertical gap between generations
-const GW = 185;  // horizontal gap between nodes
+const CW = 155;
+const CH = 72;
+const GH = 160;
+const GW = 185;
 
 let svg, g, zoom;
-let allNodes = [];
-let allLinks = [];
+let allNodes       = [];
+let allLinks       = [];
 let visibleNodeIds = new Set();
-let positions = {};
-let levelMap  = {};
-let selectedId = null;
+let positions      = {};
+let levelMap       = {};
+let selectedId     = null;
 
-// ── Load and render ───────────────────────────
+// ── Load tree data ────────────────────────────
 async function loadTree() {
     try {
-        const res = await fetch(
+        const res  = await fetch(
             SITE_URL + '/api/tree.php'
         );
         const data = await res.json();
@@ -411,7 +440,6 @@ async function loadTree() {
             data.counts.total + ' member' +
             (data.counts.total !== 1 ? 's' : '');
 
-        // Start with root + direct connections
         visibleNodeIds = new Set([ROOT_ID]);
         allLinks.forEach(l => {
             const src = l.source.id ?? l.source;
@@ -425,7 +453,6 @@ async function loadTree() {
         initSVG();
         buildAndRender();
 
-        // Hide pan hint after 4 seconds
         setTimeout(() => {
             const hint =
                 document.getElementById('pan-hint');
@@ -438,7 +465,7 @@ async function loadTree() {
     }
 }
 
-// ── Init SVG and zoom/pan ─────────────────────
+// ── Init SVG ──────────────────────────────────
 function initSVG() {
     svg  = d3.select('#tree-svg');
     g    = d3.select('#tree-g');
@@ -449,18 +476,16 @@ function initSVG() {
             g.attr('transform', ev.transform);
         });
 
-    // Enable pan and zoom on the SVG
     svg.call(zoom)
-        .on('dblclick.zoom', null); // disable dbl-click zoom
+        .on('dblclick.zoom', null);
 
-    // Click background to close panel
     svg.on('click', () => {
         closePanel();
         clearSelected();
     });
 }
 
-// ── Build levels and render ───────────────────
+// ── Build levels and positions ────────────────
 function buildAndRender() {
     const nodes = allNodes.filter(
         n => visibleNodeIds.has(n.id)
@@ -472,10 +497,8 @@ function buildAndRender() {
             && visibleNodeIds.has(tgt);
     });
 
-    // Assign generation levels
     levelMap = {};
     levelMap[ROOT_ID] = 0;
-
     const visited = new Set([ROOT_ID]);
     const queue   = [ROOT_ID];
 
@@ -484,31 +507,30 @@ function buildAndRender() {
         const currentLevel = levelMap[current];
 
         links.forEach(l => {
-            const src = l.source.id ?? l.source;
-            const tgt = l.target.id ?? l.target;
+            const src  = l.source.id ?? l.source;
+            const tgt  = l.target.id ?? l.target;
             const type = l.type;
             const lbl  = l.label || '';
 
             // current → tgt as parent
-            // tgt is ABOVE current
+            // means tgt is ABOVE current
             if (src === current
                 && type === 'parent'
                 && !visited.has(tgt)) {
-
                 let offset = -1;
                 if (lbl.includes('grandfather')
                  || lbl.includes('grandmother'))
                     offset = -2;
                 else if (lbl.includes('great_'))
                     offset = -3;
-
-                levelMap[tgt] = currentLevel + offset;
+                levelMap[tgt] =
+                    currentLevel + offset;
                 visited.add(tgt);
                 queue.push(tgt);
             }
 
             // current → tgt as child
-            // tgt is BELOW current
+            // means tgt is BELOW current
             if (src === current
                 && type === 'child'
                 && !visited.has(tgt)) {
@@ -517,7 +539,7 @@ function buildAndRender() {
                 queue.push(tgt);
             }
 
-            // tgt === current with type child
+            // tgt === current, type child
             // src is BELOW current
             if (tgt === current
                 && type === 'child'
@@ -527,13 +549,11 @@ function buildAndRender() {
                 queue.push(src);
             }
 
-            // tgt === current with type parent
+            // tgt === current, type parent
             // src is ABOVE current
             if (tgt === current
                 && type === 'parent'
                 && !visited.has(src)) {
-
-                // Find the label from root to src
                 const rootToSrc = allLinks.find(x =>
                     (x.source.id ?? x.source)
                         === ROOT_ID
@@ -548,15 +568,15 @@ function buildAndRender() {
                     offset = -2;
                 else if (srcLbl.includes('great_'))
                     offset = -3;
-
-                levelMap[src] = currentLevel + offset;
+                levelMap[src] =
+                    currentLevel + offset;
                 visited.add(src);
                 queue.push(src);
             }
 
             // Spouse / sibling → same level
-            if ((type === 'spouse'
-                 || type === 'sibling')) {
+            if (type === 'spouse'
+                || type === 'sibling') {
                 if (src === current
                     && !visited.has(tgt)) {
                     levelMap[tgt] = currentLevel;
@@ -573,13 +593,11 @@ function buildAndRender() {
         });
     }
 
-    // Fallback for unvisited
     nodes.forEach(n => {
         if (levelMap[n.id] === undefined)
             levelMap[n.id] = 0;
     });
 
-    // Group by level
     const levels = {};
     nodes.forEach(n => {
         const lv = levelMap[n.id] ?? 0;
@@ -591,7 +609,6 @@ function buildAndRender() {
         .map(Number)
         .sort((a, b) => a - b);
 
-    // Assign positions
     positions = {};
     sortedLevels.forEach(lv => {
         const members = levels[lv];
@@ -606,15 +623,29 @@ function buildAndRender() {
         });
     });
 
-    renderAll(nodes, links, sortedLevels, levels);
+    renderAll(nodes, links, sortedLevels);
 }
 
-// ── Render nodes and links ────────────────────
-function renderAll(
-    nodes, links, sortedLevels, levels
-) {
-    // Clear previous render
+// ── Render ────────────────────────────────────
+function renderAll(nodes, links, sortedLevels) {
     g.selectAll('*').remove();
+
+    // Connected IDs for highlighting
+    const connectedIds = new Set();
+    if (selectedId !== null) {
+        connectedIds.add(selectedId);
+        links.forEach(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            if (src === selectedId)
+                connectedIds.add(tgt);
+            if (tgt === selectedId)
+                connectedIds.add(src);
+        });
+    }
+    const hasSelection =
+        selectedId !== null
+        && connectedIds.size > 0;
 
     const genLabels = {
         '-4': 'Great Great Grandparents',
@@ -627,17 +658,15 @@ function renderAll(
          '3': 'Great Grandchildren',
     };
 
-    // ── Generation row labels ─────────────────
+    // Generation row labels
     sortedLevels.forEach(lv => {
         const label = genLabels[lv];
         if (!label) return;
         const y = lv * GH;
 
         g.append('line')
-            .attr('x1', -3000)
-            .attr('y1', y - CH/2 - 20)
-            .attr('x2',  3000)
-            .attr('y2', y - CH/2 - 20)
+            .attr('x1', -3000).attr('y1', y - CH/2 - 20)
+            .attr('x2',  3000).attr('y2', y - CH/2 - 20)
             .attr('stroke', '#131325')
             .attr('stroke-width', 1);
 
@@ -645,8 +674,7 @@ function renderAll(
             .attr('x', -700)
             .attr('y', y - CH/2 - 6)
             .attr('font-size', '10px')
-            .attr('font-family',
-                  'Segoe UI, sans-serif')
+            .attr('font-family', 'Segoe UI, sans-serif')
             .attr('fill', '#252545')
             .attr('font-weight', '700')
             .attr('letter-spacing', '0.1em')
@@ -664,185 +692,198 @@ function renderAll(
         const lvSrc = levelMap[src] ?? 0;
         const lvTgt = levelMap[tgt] ?? 0;
 
-        if (l.type === 'parent') {
-            // Only draw if one is directly
-            // above the other
-            let ancestor, descendant,
-                pAnc, pDesc;
+        const isActive = !hasSelection || (
+            connectedIds.has(src)
+            && connectedIds.has(tgt)
+        );
+        const opacity =
+            isActive ? 0.75 : 0.06;
+        const strokeW =
+            isActive ? 2 : 1;
 
+        if (l.type === 'parent') {
+            let pAnc, pDesc;
             if (lvSrc < lvTgt) {
-                ancestor   = src;
-                descendant = tgt;
-                pAnc  = p1;
-                pDesc = p2;
+                pAnc = p1; pDesc = p2;
             } else if (lvTgt < lvSrc) {
-                ancestor   = tgt;
-                descendant = src;
-                pAnc  = p2;
-                pDesc = p1;
+                pAnc = p2; pDesc = p1;
             } else {
-                return; // same level, skip
+                return;
             }
 
-            // Draw curved path
-            // from bottom of ancestor
-            // to top of descendant
-            const x1 = pAnc.x;
-            const y1 = pAnc.y + CH/2;
-            const x2 = pDesc.x;
-            const y2 = pDesc.y - CH/2;
+            const x1   = pAnc.x;
+            const y1   = pAnc.y + CH/2;
+            const x2   = pDesc.x;
+            const y2   = pDesc.y - CH/2;
             const midY = (y1 + y2) / 2;
 
             g.append('path')
                 .attr('class', 'link-parent')
-                .attr('d', `
-                    M ${x1} ${y1}
+                .attr('d', `M ${x1} ${y1}
                     C ${x1} ${midY},
                       ${x2} ${midY},
-                      ${x2} ${y2}
-                `);
+                      ${x2} ${y2}`)
+                .style('opacity', opacity)
+                .attr('stroke-width', strokeW);
 
-        } else if (l.type === 'spouse') {
-            // Horizontal line between spouses
-            // only draw once (src < tgt)
-            if (src < tgt) {
-                const leftX  =
-                    Math.min(p1.x, p2.x) + CW/2;
-                const rightX =
-                    Math.max(p1.x, p2.x) - CW/2;
-                const midY =
-                    (p1.y + p2.y) / 2;
+        } else if (l.type === 'spouse'
+                   && src < tgt) {
+            const leftX =
+                Math.min(p1.x, p2.x) + CW/2;
+            const rightX =
+                Math.max(p1.x, p2.x) - CW/2;
+            const midY = (p1.y + p2.y) / 2;
 
-                g.append('line')
-                    .attr('class', 'link-spouse')
-                    .attr('x1', leftX)
-                    .attr('y1', midY)
-                    .attr('x2', rightX)
-                    .attr('y2', midY);
-            }
+            g.append('line')
+                .attr('class', 'link-spouse')
+                .attr('x1', leftX).attr('y1', midY)
+                .attr('x2', rightX).attr('y2', midY)
+                .style('opacity', opacity)
+                .attr('stroke-width', strokeW);
 
-        } else if (l.type === 'sibling') {
-            // Arc between siblings
-            // only draw once
-            if (src < tgt) {
-                const leftX  =
-                    Math.min(p1.x, p2.x) + CW/2;
-                const rightX =
-                    Math.max(p1.x, p2.x) - CW/2;
-                const midY = p1.y;
+        } else if (l.type === 'sibling'
+                   && src < tgt) {
+            const leftX =
+                Math.min(p1.x, p2.x) + CW/2;
+            const rightX =
+                Math.max(p1.x, p2.x) - CW/2;
+            const midY = p1.y;
 
-                g.append('line')
-                    .attr('class', 'link-sibling')
-                    .attr('x1', leftX)
-                    .attr('y1', midY)
-                    .attr('x2', rightX)
-                    .attr('y2', midY);
-            }
+            g.append('line')
+                .attr('class', 'link-sibling')
+                .attr('x1', leftX).attr('y1', midY)
+                .attr('x2', rightX).attr('y2', midY)
+                .style('opacity', opacity)
+                .attr('stroke-width', strokeW);
         }
     });
 
     // ── Draw nodes ────────────────────────────
     nodes.forEach(n => {
-        const pos    = positions[n.id];
+        const pos = positions[n.id];
         if (!pos) return;
 
-        const isRoot = n.id === ROOT_ID;
+        const isRoot     = n.id === ROOT_ID;
         const isSelected = n.id === selectedId;
+        const isConn     =
+            !hasSelection
+            || connectedIds.has(n.id);
+
+        const nodeOpacity = isConn ? 1.0 : 0.15;
 
         const accentColor =
-            isRoot         ? '#00d4ff' :
-            n.is_deceased  ? '#555'    :
+            isRoot        ? '#00d4ff' :
+            n.is_deceased ? '#555'    :
             n.gender === 'female' ? '#d94a8a' :
             '#4a90d9';
 
         const fillColor =
-            isRoot         ? '#0d1a3e' :
-            n.is_deceased  ? '#0f0f0f' :
+            isRoot        ? '#0d1a3e' :
+            n.is_deceased ? '#0f0f0f' :
             n.gender === 'female' ? '#1a0d1a' :
             '#0d1526';
 
         const ng = g.append('g')
-            .attr('class',
-                'node-card'
+            .attr('class', 'node-card'
                 + (isSelected ? ' selected' : ''))
             .attr('data-id', n.id)
             .attr('transform',
                 `translate(${pos.x},${pos.y})`)
             .style('cursor', 'pointer')
+            .style('opacity', nodeOpacity)
             .on('click', (event) => {
                 event.stopPropagation();
                 onNodeClick(n);
             });
 
+        // Glow ring for selected node
+        if (isSelected) {
+            ng.append('rect')
+                .attr('x',  -CW/2 - 5)
+                .attr('y',  -CH/2 - 5)
+                .attr('width',  CW + 10)
+                .attr('height', CH + 10)
+                .attr('rx', 15).attr('ry', 15)
+                .attr('fill', 'none')
+                .attr('stroke', '#00d4ff')
+                .attr('stroke-width', 2)
+                .attr('opacity', 0.5);
+        }
+
+        // Dashed ring for connected nodes
+        if (hasSelection
+            && connectedIds.has(n.id)
+            && !isSelected) {
+            ng.append('rect')
+                .attr('x',  -CW/2 - 3)
+                .attr('y',  -CH/2 - 3)
+                .attr('width',  CW + 6)
+                .attr('height', CH + 6)
+                .attr('rx', 13).attr('ry', 13)
+                .attr('fill', 'none')
+                .attr('stroke', accentColor)
+                .attr('stroke-width', 1)
+                .attr('opacity', 0.5)
+                .attr('stroke-dasharray', '4,2');
+        }
+
         // Card background
         ng.append('rect')
             .attr('class', 'card-bg')
-            .attr('x',  -CW/2)
-            .attr('y',  -CH/2)
-            .attr('width',  CW)
-            .attr('height', CH)
-            .attr('rx', 10)
-            .attr('ry', 10)
-            .attr('fill', isSelected
-                ? d3.color(fillColor).brighter(0.5)
-                : fillColor)
-            .attr('stroke', isSelected
-                ? '#fff'
-                : accentColor)
+            .attr('x',  -CW/2).attr('y', -CH/2)
+            .attr('width', CW).attr('height', CH)
+            .attr('rx', 10).attr('ry', 10)
+            .attr('fill',
+                isSelected ? '#1a2a4e' : fillColor)
+            .attr('stroke',
+                isSelected ? '#00d4ff' : accentColor)
             .attr('stroke-width',
-                isRoot ? 2.5 :
-                isSelected ? 2.5 : 1.5)
+                isSelected ? 2.5 :
+                isRoot     ? 2   : 1.5)
             .attr('stroke-dasharray',
                 n.is_deceased ? '5,3' : 'none');
 
         // Avatar circle
         ng.append('circle')
-            .attr('cx', -CW/2 + 24)
-            .attr('cy', 0)
+            .attr('cx', -CW/2 + 24).attr('cy', 0)
             .attr('r',  16)
-            .attr('fill', isRoot
-                ? '#1a2a5e'
-                : n.is_deceased
-                    ? '#1a1a1a'
-                    : n.gender === 'female'
-                        ? '#2e0d2e'
-                        : '#0d1e3a')
+            .attr('fill',
+                isRoot        ? '#1a2a5e' :
+                n.is_deceased ? '#1a1a1a' :
+                n.gender === 'female'
+                              ? '#2e0d2e' :
+                '#0d1e3a')
             .attr('stroke', accentColor)
             .attr('stroke-width', 1.5);
 
-        // Initial letter
+        // Initial
         ng.append('text')
-            .attr('x', -CW/2 + 24)
-            .attr('y', 5)
+            .attr('x', -CW/2 + 24).attr('y', 5)
             .attr('text-anchor', 'middle')
             .attr('font-size', '12px')
             .attr('font-weight', '700')
-            .attr('font-family',
-                  'Segoe UI, sans-serif')
+            .attr('font-family', 'Segoe UI, sans-serif')
             .attr('fill', accentColor)
             .text(n.name.charAt(0).toUpperCase());
 
         // Name
         const dName = n.preferred_name || n.name;
         const tName = dName.length > 11
-            ? dName.substring(0, 10) + '…'
-            : dName;
+            ? dName.substring(0, 10) + '…' : dName;
 
         ng.append('text')
             .attr('x', -CW/2 + 47)
             .attr('y', n.date_range ? -10 : 2)
             .attr('font-size', '12px')
             .attr('font-weight', '600')
-            .attr('font-family',
-                  'Segoe UI, sans-serif')
+            .attr('font-family', 'Segoe UI, sans-serif')
             .attr('fill', isRoot ? '#fff' : '#ddd')
             .text(tName);
 
         // Date range
         if (n.date_range) {
             ng.append('text')
-                .attr('x', -CW/2 + 47)
-                .attr('y', 4)
+                .attr('x', -CW/2 + 47).attr('y', 4)
                 .attr('font-size', '9px')
                 .attr('font-family',
                       'Segoe UI, sans-serif')
@@ -859,8 +900,7 @@ function renderAll(
                 .attr('font-family',
                       'Segoe UI, sans-serif')
                 .attr('fill',
-                    n.quarter_id
-                    ? '#00d4ff' : '#777')
+                    n.quarter_id ? '#00d4ff' : '#777')
                 .attr('opacity', 0.85)
                 .text(n.quarter.length > 13
                     ? n.quarter.substring(0,12) + '…'
@@ -872,8 +912,7 @@ function renderAll(
             ng.append('rect')
                 .attr('x',  CW/2 - 34)
                 .attr('y', -CH/2 + 3)
-                .attr('width',  30)
-                .attr('height', 15)
+                .attr('width', 30).attr('height', 15)
                 .attr('rx', 4)
                 .attr('fill', '#00d4ff');
 
@@ -894,7 +933,7 @@ function renderAll(
             ng.append('circle')
                 .attr('cx', CW/2 - 9)
                 .attr('cy', -CH/2 + 9)
-                .attr('r',  7)
+                .attr('r', 7)
                 .attr('fill', '#00d4ff');
 
             ng.append('text')
@@ -918,9 +957,7 @@ function renderAll(
                 .text('†');
         }
 
-        // Expand indicator
-        // Show + if this node has connections
-        // not yet visible
+        // Expand indicator (+)
         const hasHidden = allLinks.some(l => {
             const src = l.source.id ?? l.source;
             const tgt = l.target.id ?? l.target;
@@ -932,16 +969,14 @@ function renderAll(
 
         if (hasHidden) {
             ng.append('circle')
-                .attr('cx', 0)
-                .attr('cy', CH/2)
-                .attr('r',  8)
+                .attr('cx', 0).attr('cy', CH/2)
+                .attr('r', 8)
                 .attr('fill', '#1e1e3a')
                 .attr('stroke', '#00d4ff')
                 .attr('stroke-width', 1.5);
 
             ng.append('text')
-                .attr('x', 0)
-                .attr('y', CH/2 + 4)
+                .attr('x', 0).attr('y', CH/2 + 4)
                 .attr('text-anchor', 'middle')
                 .attr('font-size', '11px')
                 .attr('font-weight', '700')
@@ -952,20 +987,25 @@ function renderAll(
         }
     });
 
-    // Animate in
+    // Fade in
     g.selectAll('.node-card')
         .style('opacity', 0)
         .transition()
-        .duration(400)
-        .style('opacity', 1);
+        .duration(300)
+        .style('opacity', function() {
+            const id = parseInt(
+                d3.select(this).attr('data-id')
+            );
+            if (!hasSelection) return 1.0;
+            return connectedIds.has(id) ? 1.0 : 0.15;
+        });
 }
 
-// ── Node click handler ────────────────────────
+// ── Node click ────────────────────────────────
 function onNodeClick(n) {
+    if (!n) return;
     selectedId = n.id;
 
-    // Expand: add all connections
-    // of this node to visible set
     let added = false;
     allLinks.forEach(l => {
         const src = l.source.id ?? l.source;
@@ -982,11 +1022,31 @@ function onNodeClick(n) {
         }
     });
 
-    // Re-render with expanded nodes
     buildAndRender();
-
-    // Show detail panel
     showDetail(n);
+
+    if (added) {
+        setTimeout(() => centerOnNode(n.id), 400);
+    }
+}
+
+// ── Center on a node ──────────────────────────
+function centerOnNode(nodeId) {
+    const pos = positions[nodeId];
+    if (!pos) return;
+    const el = document.getElementById('tree-page');
+    const W  = el.offsetWidth;
+    const H  = el.offsetHeight;
+    const t  = d3.zoomTransform(svg.node());
+    svg.transition().duration(500)
+        .call(zoom.transform,
+            d3.zoomIdentity
+                .translate(
+                    W/2 - pos.x * t.k,
+                    H/2 - pos.y * t.k
+                )
+                .scale(t.k)
+        );
 }
 
 // ── Detail panel ──────────────────────────────
@@ -997,39 +1057,31 @@ function showDetail(n) {
         n.gender === 'female' ? '#d94a8a' :
         '#4a90d9';
 
-    // Find this node's connections
-    // from allLinks
-    const connections = [];
+    // Build unique connections list
+    const seen = new Set();
+    const uniqueConn = [];
     allLinks.forEach(l => {
         const src = l.source.id ?? l.source;
         const tgt = l.target.id ?? l.target;
         let otherId = null;
-
         if (src === n.id) otherId = tgt;
         else if (tgt === n.id) otherId = src;
+        if (otherId === null) return;
 
-        if (otherId !== null) {
-            const other = allNodes.find(
-                x => x.id === otherId
-            );
-            if (other) {
-                connections.push({
-                    member: other,
-                    type:   l.type,
-                    label:  l.label,
-                    isSrc:  src === n.id,
-                });
-            }
-        }
-    });
-
-    // Remove duplicate connections
-    const seen = new Set();
-    const uniqueConn = connections.filter(c => {
-        const key = c.member.id + '_' + c.type;
-        if (seen.has(key)) return false;
+        const key = otherId + '_' + l.type;
+        if (seen.has(key)) return;
         seen.add(key);
-        return true;
+
+        const other = allNodes.find(
+            x => x.id === otherId
+        );
+        if (other) {
+            uniqueConn.push({
+                member: other,
+                type:   l.type,
+                label:  l.label,
+            });
+        }
     });
 
     document.getElementById('panel-content')
@@ -1040,8 +1092,7 @@ function showDetail(n) {
             <div style="
                 width:58px;height:58px;
                 border-radius:50%;
-                background:${
-                    n.gender === 'female'
+                background:${n.gender === 'female'
                     ? '#2e0d2e' : '#0d1e3a'};
                 border:2px solid ${gc};
                 ${n.is_deceased
@@ -1055,13 +1106,11 @@ function showDetail(n) {
                 ${n.name.charAt(0).toUpperCase()}
             </div>
             <h4 style="color:#fff;font-size:1rem;
-                       font-weight:600;
-                       margin-bottom:3px">
+                       font-weight:600;margin-bottom:3px">
                 ${esc(n.name)}
             </h4>
             ${n.preferred_name ? `
-            <div style="color:#888;
-                        font-size:0.8rem;
+            <div style="color:#888;font-size:0.8rem;
                         margin-bottom:5px">
                 "${esc(n.preferred_name)}"
             </div>` : ''}
@@ -1075,96 +1124,73 @@ function showDetail(n) {
                 ${esc(n.quarter || 'Unknown')}
             </div>
             ${n.is_deceased ? `
-            <div style="color:#555;
-                        font-size:0.78rem;
-                        margin-top:5px">
-                † Deceased
+            <div style="color:#555;font-size:0.78rem;
+                        margin-top:5px">† Deceased
             </div>` : ''}
             ${n.verified ? `
-            <div style="color:#00d4ff;
-                        font-size:0.75rem;
-                        margin-top:3px">
-                ✓ Verified
+            <div style="color:#00d4ff;font-size:0.75rem;
+                        margin-top:3px">✓ Verified
             </div>` : ''}
         </div>
 
-        <!-- Vital stats -->
         ${(n.date_range || n.birthplace
            || n.occupation) ? `
-        <div style="
-            background:#0d0d1a;
-            border:1px solid #1e1e3a;
-            border-radius:10px;
-            padding:0.85rem 1rem;
-            margin-bottom:1rem;
-        ">
+        <div style="background:#0d0d1a;
+                    border:1px solid #1e1e3a;
+                    border-radius:10px;
+                    padding:0.85rem 1rem;
+                    margin-bottom:1rem;">
             ${n.date_range ? `
             <div style="display:flex;gap:8px;
                         margin-bottom:0.5rem">
-                <span style="color:#555;
-                             font-size:0.8rem">📅
-                </span>
-                <span style="color:#aaa;
-                             font-size:0.82rem">
-                    ${esc(n.date_range)}
-                </span>
+                <span style="color:#555;font-size:0.8rem">
+                    📅</span>
+                <span style="color:#aaa;font-size:0.82rem">
+                    ${esc(n.date_range)}</span>
             </div>` : ''}
             ${n.birthplace ? `
             <div style="display:flex;gap:8px;
                         margin-bottom:0.5rem">
-                <span style="color:#555;
-                             font-size:0.8rem">📍
-                </span>
-                <span style="color:#aaa;
-                             font-size:0.82rem">
-                    ${esc(n.birthplace)}
-                </span>
+                <span style="color:#555;font-size:0.8rem">
+                    📍</span>
+                <span style="color:#aaa;font-size:0.82rem">
+                    ${esc(n.birthplace)}</span>
             </div>` : ''}
             ${n.occupation ? `
             <div style="display:flex;gap:8px">
-                <span style="color:#555;
-                             font-size:0.8rem">💼
-                </span>
-                <span style="color:#aaa;
-                             font-size:0.82rem">
-                    ${esc(n.occupation)}
-                </span>
+                <span style="color:#555;font-size:0.8rem">
+                    💼</span>
+                <span style="color:#aaa;font-size:0.82rem">
+                    ${esc(n.occupation)}</span>
             </div>` : ''}
         </div>` : ''}
 
-        <!-- Bio -->
         ${n.bio ? `
-        <div style="
-            color:#888;font-size:0.82rem;
-            line-height:1.6;
-            padding:0.75rem;
-            border-left:2px solid #1e1e3a;
-            margin-bottom:1rem;
-        ">
+        <div style="color:#888;font-size:0.82rem;
+                    line-height:1.6;padding:0.75rem;
+                    border-left:2px solid #1e1e3a;
+                    margin-bottom:1rem;">
             ${esc(n.bio)}
         </div>` : ''}
 
-        <!-- Connections -->
         ${uniqueConn.length ? `
         <div style="margin-bottom:1rem">
-            <div style="
-                font-size:0.72rem;font-weight:600;
-                text-transform:uppercase;
-                letter-spacing:0.06em;
-                color:#555;margin-bottom:0.6rem;
-            ">
+            <div style="font-size:0.72rem;
+                        font-weight:600;
+                        text-transform:uppercase;
+                        letter-spacing:0.06em;
+                        color:#555;
+                        margin-bottom:0.6rem;">
                 Connections
             </div>
             ${uniqueConn.map(c => `
-            <div style="
-                display:flex;align-items:center;
-                gap:0.6rem;padding:0.5rem 0;
-                border-bottom:1px solid #1a1a2e;
-                cursor:pointer;
-            "
-            onclick="onNodeClick(
-                allNodes.find(x => x.id === ${c.member.id})
-            )">
+            <div onclick="onNodeClick(
+                     allNodes.find(x=>x.id===${c.member.id})
+                 )"
+                 style="display:flex;align-items:center;
+                        gap:0.6rem;padding:0.5rem 0;
+                        border-bottom:1px solid #1a1a2e;
+                        cursor:pointer;">
                 <div style="
                     width:30px;height:30px;
                     border-radius:50%;
@@ -1172,8 +1198,7 @@ function showDetail(n) {
                     display:flex;align-items:center;
                     justify-content:center;
                     font-size:0.85rem;font-weight:700;
-                    color:#00d4ff;flex-shrink:0;
-                ">
+                    color:#00d4ff;flex-shrink:0;">
                     ${c.member.name.charAt(0)
                         .toUpperCase()}
                 </div>
@@ -1182,58 +1207,49 @@ function showDetail(n) {
                                 font-size:0.85rem;
                                 white-space:nowrap;
                                 overflow:hidden;
-                                text-overflow:ellipsis">
+                                text-overflow:ellipsis;">
                         ${esc(c.member.name)}
                     </div>
                     <div style="color:#00d4ff;
-                                font-size:0.75rem">
-                        ${esc(c.type)}
+                                font-size:0.75rem;">
+                        ${esc(c.label
+                            ? c.label.replace(/_/g,' ')
+                            : c.type)}
                     </div>
                 </div>
-                <div style="color:#333;
-                            font-size:0.8rem">›</div>
+                <div style="color:#333;font-size:0.8rem">
+                    ›
+                </div>
             </div>`).join('')}
         </div>` : ''}
 
-        <!-- Actions -->
-        <div style="
-            display:flex;flex-direction:column;
-            gap:0.5rem;margin-top:0.5rem;
-        ">
+        <div style="display:flex;flex-direction:column;
+                    gap:0.5rem;margin-top:0.5rem;">
             ${!isRoot ? `
-            <button onclick="alert(
-                'Messaging coming soon')"
-                style="
-                    background:#00d4ff;
-                    border:none;color:#000;
-                    padding:0.65rem;
-                    border-radius:8px;
-                    font-size:0.85rem;
-                    font-weight:600;
-                    cursor:pointer;width:100%;
-                ">
+            <button onclick="alert('Messaging coming soon')"
+                    style="background:#00d4ff;border:none;
+                           color:#000;padding:0.65rem;
+                           border-radius:8px;
+                           font-size:0.85rem;
+                           font-weight:600;
+                           cursor:pointer;width:100%;">
                 💬 Send Message
             </button>` : `
-            <div style="
-                background:rgba(0,212,255,0.06);
-                border:1px solid rgba(0,212,255,0.15);
-                border-radius:8px;padding:0.65rem;
-                text-align:center;
-                color:#00d4ff;font-size:0.82rem;
-            ">
+            <div style="background:rgba(0,212,255,0.06);
+                        border:1px solid rgba(0,212,255,0.15);
+                        border-radius:8px;padding:0.65rem;
+                        text-align:center;
+                        color:#00d4ff;font-size:0.82rem;">
                 This is your profile node
             </div>`}
             <a href="${SITE_URL}/family/add.php"
-               style="
-                    background:#1e1e3a;
-                    border:1px solid #2a2a4a;
-                    color:#aaa;padding:0.65rem;
-                    border-radius:8px;
-                    font-size:0.85rem;
-                    display:block;
-                    text-align:center;
-                    text-decoration:none;
-               ">
+               style="background:#1e1e3a;
+                      border:1px solid #2a2a4a;
+                      color:#aaa;padding:0.65rem;
+                      border-radius:8px;
+                      font-size:0.85rem;display:block;
+                      text-align:center;
+                      text-decoration:none;">
                 + Add Their Relative
             </a>
         </div>
@@ -1253,7 +1269,7 @@ function clearSelected() {
     buildAndRender();
 }
 
-// ── Zoom controls ─────────────────────────────
+// ── Zoom ──────────────────────────────────────
 function zoomIn() {
     svg.transition().duration(250)
         .call(zoom.scaleBy, 1.4);
@@ -1265,10 +1281,9 @@ function zoomOut() {
 }
 
 function resetView() {
-    const el =
-        document.getElementById('tree-page');
-    const W = el.offsetWidth;
-    const H = el.offsetHeight;
+    const el = document.getElementById('tree-page');
+    const W  = el.offsetWidth;
+    const H  = el.offsetHeight;
     svg.transition().duration(600)
         .call(zoom.transform,
             d3.zoomIdentity
@@ -1278,8 +1293,7 @@ function resetView() {
 }
 
 function toggleLegend() {
-    const l =
-        document.getElementById('tree-legend');
+    const l = document.getElementById('tree-legend');
     l.style.display =
         l.style.display === 'block'
         ? 'none' : 'block';
@@ -1301,6 +1315,314 @@ function esc(str) {
         .replace(/"/g,  '&quot;')
         .replace(/'/g,  '&#39;');
 }
+
+// ── Search ────────────────────────────────────
+let searchTimer = null;
+
+function onSearchInput(val) {
+    const clear =
+        document.getElementById('search-clear');
+    const wrapper =
+        document.getElementById('search-wrapper');
+    clear.style.display  = val ? 'block' : 'none';
+    wrapper.style.borderColor =
+        val ? '#00d4ff' : '#1e1e3a';
+    clearTimeout(searchTimer);
+    if (!val || val.length < 2) {
+        hideSearch();
+        return;
+    }
+    searchTimer = setTimeout(
+        () => doSearch(val), 300
+    );
+}
+
+async function doSearch(query) {
+    const box =
+        document.getElementById('search-results');
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div style="padding:1rem;text-align:center;
+                    color:#555;font-size:0.82rem;">
+            Searching...
+        </div>`;
+    try {
+        const res = await fetch(
+            SITE_URL + '/api/search.php?q='
+            + encodeURIComponent(query)
+        );
+        const data = await res.json();
+        renderSearchResults(data, query);
+    } catch(e) {
+        box.innerHTML = `
+            <div style="padding:1rem;
+                        text-align:center;
+                        color:#ff6b6b;
+                        font-size:0.82rem;">
+                Search failed. Try again.
+            </div>`;
+    }
+}
+
+function renderSearchResults(data, query) {
+    const box =
+        document.getElementById('search-results');
+
+    if (!data.results || !data.results.length) {
+        box.innerHTML = `
+            <div style="padding:1.25rem;
+                        text-align:center;color:#555;">
+                <div style="font-size:1.5rem;
+                            margin-bottom:0.5rem">🔍</div>
+                <div style="font-size:0.85rem;
+                            color:#888;">
+                    No results for
+                    "<strong style="color:#aaa">
+                        ${esc(query)}
+                    </strong>"
+                </div>
+            </div>`;
+        return;
+    }
+
+    const header = `
+        <div style="padding:0.6rem 1rem;
+                    border-bottom:1px solid #1e1e3a;
+                    font-size:0.75rem;color:#555;">
+            ${data.total} result${
+                data.total !== 1 ? 's' : ''
+            } for
+            "<strong style="color:#888">
+                ${esc(query)}
+            </strong>"
+        </div>`;
+
+    const items = data.results.map(r => {
+        const gc =
+            r.gender === 'female'
+            ? '#d94a8a' : '#4a90d9';
+        const safeR = JSON.stringify(r)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
+        return `
+        <div onclick='selectSearchResult(${
+                JSON.stringify(r)
+            })'
+             style="display:flex;align-items:center;
+                    gap:0.75rem;padding:0.75rem 1rem;
+                    cursor:pointer;
+                    border-bottom:1px solid #0d0d1a;"
+             onmouseover="this.style.background='#1a1a2e'"
+             onmouseout="this.style.background='transparent'">
+            <div style="
+                width:38px;height:38px;
+                border-radius:50%;flex-shrink:0;
+                background:${r.gender === 'female'
+                    ? '#2e0d2e' : '#0d1e3a'};
+                border:1.5px solid ${
+                    r.is_deceased ? '#444' : gc};
+                ${r.is_deceased
+                    ? 'border-style:dashed;' : ''}
+                display:flex;align-items:center;
+                justify-content:center;
+                font-size:0.9rem;font-weight:700;
+                color:${r.is_deceased ? '#444' : gc};">
+                ${r.full_name.charAt(0).toUpperCase()}
+            </div>
+            <div style="flex:1;min-width:0">
+                <div style="color:#fff;font-size:0.88rem;
+                            font-weight:500;
+                            white-space:nowrap;
+                            overflow:hidden;
+                            text-overflow:ellipsis;">
+                    ${esc(r.full_name)}
+                    ${r.verified
+                        ? '<span style="background:#00d4ff;color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;">✓</span>'
+                        : ''}
+                    ${r.is_deceased
+                        ? '<span style="color:#555;font-size:10px">†</span>'
+                        : ''}
+                </div>
+                <div style="display:flex;
+                            align-items:center;
+                            gap:6px;margin-top:2px;">
+                    <span style="
+                        background:rgba(0,212,255,0.1);
+                        border:1px solid rgba(0,212,255,0.2);
+                        color:#00d4ff;font-size:0.7rem;
+                        padding:1px 6px;
+                        border-radius:10px;">
+                        ${esc(r.quarter || 'Unknown')}
+                    </span>
+                    ${r.date_range
+                        ? `<span style="color:#555;font-size:0.75rem">${esc(r.date_range)}</span>`
+                        : ''}
+                </div>
+                ${r.occupation
+                    ? `<div style="color:#666;font-size:0.75rem;margin-top:1px">${esc(r.occupation)}</div>`
+                    : ''}
+            </div>
+            ${r.has_account
+                ? '<div title="Has HeritageLink account" style="width:8px;height:8px;border-radius:50%;background:#00d4ff;flex-shrink:0;"></div>'
+                : ''}
+        </div>`;
+    }).join('');
+
+    box.innerHTML = header + items;
+}
+
+function selectSearchResult(member) {
+    clearSearch();
+    showSearchedMember(member);
+}
+
+function showSearchedMember(m) {
+    const gc =
+        m.gender === 'female'
+        ? '#d94a8a' : '#4a90d9';
+
+    document.getElementById('panel-content')
+        .innerHTML = `
+        <div style="background:rgba(0,212,255,0.06);
+                    border:1px solid rgba(0,212,255,0.15);
+                    border-radius:8px;
+                    padding:0.5rem 0.75rem;
+                    font-size:0.75rem;color:#888;
+                    margin-bottom:1rem;">
+            <i class="ti ti-search"
+               style="color:#00d4ff;
+                      margin-right:4px"></i>
+            Community search result
+        </div>
+        <div style="text-align:center;
+                    margin-bottom:1.25rem">
+            <div style="
+                width:58px;height:58px;
+                border-radius:50%;
+                background:${m.gender === 'female'
+                    ? '#2e0d2e' : '#0d1e3a'};
+                border:2px solid ${gc};
+                ${m.is_deceased
+                    ? 'border-style:dashed;' : ''}
+                display:flex;align-items:center;
+                justify-content:center;
+                font-size:1.3rem;font-weight:700;
+                color:${gc};
+                margin:0 auto 0.75rem;">
+                ${m.full_name.charAt(0).toUpperCase()}
+            </div>
+            <h4 style="color:#fff;font-size:1rem;
+                       font-weight:600;margin-bottom:3px">
+                ${esc(m.full_name)}
+            </h4>
+            ${m.preferred_name ? `
+            <div style="color:#888;font-size:0.8rem;
+                        margin-bottom:5px">
+                "${esc(m.preferred_name)}"
+            </div>` : ''}
+            <div style="display:inline-block;
+                        background:rgba(0,212,255,0.1);
+                        border:1px solid rgba(0,212,255,0.2);
+                        color:#00d4ff;font-size:0.72rem;
+                        padding:2px 10px;
+                        border-radius:20px;">
+                ${esc(m.quarter || 'Unknown')}
+            </div>
+            ${m.is_deceased ? `
+            <div style="color:#555;font-size:0.78rem;
+                        margin-top:5px">† Deceased
+            </div>` : ''}
+            ${m.verified ? `
+            <div style="color:#00d4ff;font-size:0.75rem;
+                        margin-top:3px">
+                ✓ Verified record
+            </div>` : ''}
+        </div>
+        ${(m.date_range || m.birthplace
+           || m.occupation) ? `
+        <div style="background:#0d0d1a;
+                    border:1px solid #1e1e3a;
+                    border-radius:10px;
+                    padding:0.85rem 1rem;
+                    margin-bottom:1rem;">
+            ${m.date_range ? `
+            <div style="display:flex;gap:8px;
+                        margin-bottom:0.5rem">
+                <span style="color:#555;font-size:0.8rem">📅</span>
+                <span style="color:#aaa;font-size:0.82rem">
+                    ${esc(m.date_range)}</span>
+            </div>` : ''}
+            ${m.birthplace ? `
+            <div style="display:flex;gap:8px;
+                        margin-bottom:0.5rem">
+                <span style="color:#555;font-size:0.8rem">📍</span>
+                <span style="color:#aaa;font-size:0.82rem">
+                    ${esc(m.birthplace)}</span>
+            </div>` : ''}
+            ${m.occupation ? `
+            <div style="display:flex;gap:8px">
+                <span style="color:#555;font-size:0.8rem">💼</span>
+                <span style="color:#aaa;font-size:0.82rem">
+                    ${esc(m.occupation)}</span>
+            </div>` : ''}
+        </div>` : ''}
+        <div style="display:flex;flex-direction:column;
+                    gap:0.5rem;">
+            <button onclick="alert('Messaging coming soon')"
+                    style="background:#00d4ff;border:none;
+                           color:#000;padding:0.65rem;
+                           border-radius:8px;
+                           font-size:0.85rem;font-weight:600;
+                           cursor:pointer;width:100%;">
+                💬 Send Message
+            </button>
+            <a href="${SITE_URL}/family/add.php"
+               style="background:#1e1e3a;
+                      border:1px solid #2a2a4a;
+                      color:#aaa;padding:0.65rem;
+                      border-radius:8px;font-size:0.85rem;
+                      display:block;text-align:center;
+                      text-decoration:none;">
+                + Add as Family Member
+            </a>
+        </div>
+    `;
+
+    document.getElementById('detail-panel')
+        .classList.add('open');
+}
+
+function onSearchKey(event) {
+    if (event.key === 'Escape') clearSearch();
+}
+
+function clearSearch() {
+    document.getElementById('tree-search').value = '';
+    document.getElementById('search-clear')
+        .style.display = 'none';
+    document.getElementById('search-wrapper')
+        .style.borderColor = '#1e1e3a';
+    hideSearch();
+}
+
+function hideSearch() {
+    const box =
+        document.getElementById('search-results');
+    box.style.display = 'none';
+    box.innerHTML = '';
+}
+
+document.addEventListener('click', (e) => {
+    const wrapper =
+        document.getElementById('search-wrapper');
+    const results =
+        document.getElementById('search-results');
+    if (wrapper && results
+        && !wrapper.contains(e.target)
+        && !results.contains(e.target)) {
+        hideSearch();
+    }
+});
 
 loadTree();
 </script>
