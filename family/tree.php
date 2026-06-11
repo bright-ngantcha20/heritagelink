@@ -1058,31 +1058,35 @@ function showDetail(n) {
         '#4a90d9';
 
     // Build unique connections list
-    const seen = new Set();
-    const uniqueConn = [];
-    allLinks.forEach(l => {
-        const src = l.source.id ?? l.source;
-        const tgt = l.target.id ?? l.target;
-        let otherId = null;
-        if (src === n.id) otherId = tgt;
-        else if (tgt === n.id) otherId = src;
-        if (otherId === null) return;
+    const connMap = new Map();
+allLinks.forEach(l => {
+    const src = l.source.id ?? l.source;
+    const tgt = l.target.id ?? l.target;
 
-        const key = otherId + '_' + l.type;
-        if (seen.has(key)) return;
-        seen.add(key);
+    // Only process links WHERE this node
+    // is the SOURCE (member_id_1)
+    // This gives us the relationship
+    // FROM this node's perspective
+    if (src !== n.id) return;
 
-        const other = allNodes.find(
-            x => x.id === otherId
-        );
-        if (other) {
-            uniqueConn.push({
-                member: other,
-                type:   l.type,
-                label:  l.label,
-            });
-        }
-    });
+    const other = allNodes.find(
+        x => x.id === tgt
+    );
+    if (!other) return;
+
+    // If we already have this person
+    // keep the one with a specific label
+    if (!connMap.has(tgt)
+        || l.label) {
+        connMap.set(tgt, {
+            member: other,
+            type:   l.type,
+            label:  l.label,
+        });
+    }
+});
+
+const uniqueConn = Array.from(connMap.values());
 
     document.getElementById('panel-content')
         .innerHTML = `
