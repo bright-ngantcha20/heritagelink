@@ -1,0 +1,25 @@
+# Database credentials - never commit this
+config.php
+
+# User uploaded files
+uploads/photos/*
+uploads/documents/*
+uploads/audio/*
+
+# Keep folder structure
+!uploads/photos/.gitkeep
+!uploads/documents/.gitkeep
+!uploads/audio/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+
+# PHP logs
+*.log
+error_log
