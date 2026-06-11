@@ -413,50 +413,80 @@ async function loadTree() {
     }
 }
 
-// ── Build generation layers ───────────────────
 function buildHierarchy(data) {
     const nodes = data.nodes;
     const links = data.links;
 
-    // Assign generation levels
-    // Root = level 0
-    // Parents = level -1, -2 etc (going up)
-    // Children = level 1, 2 etc (going down)
+    // levelMap: ROOT = 0
+    // Ancestors = negative numbers (going up)
+    // Descendants = positive numbers (going down)
     const levelMap = {};
     levelMap[ROOT_ID] = 0;
 
-    // BFS to assign levels
     const visited = new Set([ROOT_ID]);
     const queue   = [ROOT_ID];
 
     while (queue.length) {
-        const current = queue.shift();
+        const current      = queue.shift();
         const currentLevel = levelMap[current];
 
         links.forEach(l => {
-            const src = l.source.id ?? l.source;
-            const tgt = l.target.id ?? l.target;
+            const src   = l.source.id ?? l.source;
+            const tgt   = l.target.id ?? l.target;
+            const type  = l.type;
+            const label = l.label || '';
 
-            // Parent of current → one level up
-            if (tgt === current
-                && l.type === 'parent'
-                && !visited.has(src)) {
-                levelMap[src] = currentLevel - 1;
-                visited.add(src);
-                queue.push(src);
+            // ── Rule 1 ────────────────────────
+            // current → someone with type=parent
+            // means: that someone IS the parent
+            // of current → goes ONE LEVEL UP
+            if (src === current
+                && type === 'parent'
+                && !visited.has(tgt)) {
+                levelMap[tgt] = currentLevel - 1;
+                visited.add(tgt);
+                queue.push(tgt);
             }
 
-            // Child of current → one level down
+            // ── Rule 2 ────────────────────────
+            // current → someone with type=child
+            // means: that someone IS the child
+            // of current → goes ONE LEVEL DOWN
             if (src === current
-                && l.type === 'parent'
+                && type === 'child'
                 && !visited.has(tgt)) {
                 levelMap[tgt] = currentLevel + 1;
                 visited.add(tgt);
                 queue.push(tgt);
             }
 
-            // Spouse → same level
-            if (l.type === 'spouse') {
+            // ── Rule 3 ────────────────────────
+            // someone → current with type=child
+            // means: current IS the parent
+            // of that someone
+            // → that someone goes ONE LEVEL DOWN
+            if (tgt === current
+                && type === 'child'
+                && !visited.has(src)) {
+                levelMap[src] = currentLevel + 1;
+                visited.add(src);
+                queue.push(src);
+            }
+
+            // ── Rule 4 ────────────────────────
+            // someone → current with type=parent
+            // means: current IS the child
+            // → that someone goes ONE LEVEL UP
+            if (tgt === current
+                && type === 'parent'
+                && !visited.has(src)) {
+                levelMap[src] = currentLevel - 1;
+                visited.add(src);
+                queue.push(src);
+            }
+
+            // ── Spouse → same level ───────────
+            if (type === 'spouse') {
                 if (src === current
                     && !visited.has(tgt)) {
                     levelMap[tgt] = currentLevel;
@@ -471,8 +501,8 @@ function buildHierarchy(data) {
                 }
             }
 
-            // Sibling → same level
-            if (l.type === 'sibling') {
+            // ── Sibling → same level ──────────
+            if (type === 'sibling') {
                 if (src === current
                     && !visited.has(tgt)) {
                     levelMap[tgt] = currentLevel;
@@ -496,23 +526,47 @@ function buildHierarchy(data) {
         }
     });
 
+    // ── Extra rule for grandparents ───────────
+    // If a node at level -1 also has a parent
+    // relationship to another node, push that
+    // node to level -2
+    // This is already handled by BFS above
+    // but we need to handle grandfather specifically
+    // by checking the relation_label
+    nodes.forEach(n => {
+        const label = '';
+        // Find links FROM this node
+        links.forEach(l => {
+            const src   = l.source.id ?? l.source;
+            const tgt   = l.target.id ?? l.target;
+            const lbl   = l.label || '';
+
+            // If Brighton → 8 with label
+            // grandfather_paternal
+            // then 8 should be at level -2
+            if (src === ROOT_ID
+                && tgt === n.id
+                && (lbl.includes('grandfather')
+                    || lbl.includes('grandmother')
+                    || lbl.includes('great_'))) {
+                levelMap[n.id] = -2;
+            }
+        });
+    });
+
     // Group nodes by level
     const levels = {};
     nodes.forEach(n => {
-        const lv = levelMap[n.id];
+        const lv = levelMap[n.id] ?? 0;
         if (!levels[lv]) levels[lv] = [];
         levels[lv].push(n);
     });
 
-    // Sort levels
     const sortedLevels = Object.keys(levels)
         .map(Number)
-        .sort((a,b) => a - b);
+        .sort((a, b) => a - b);
 
-    const minLevel = sortedLevels[0];
-    const maxLevel = sortedLevels[sortedLevels.length-1];
-
-    // Assign x,y positions
+    // ── Assign X Y positions ──────────────────
     const positions = {};
 
     sortedLevels.forEach(lv => {
@@ -558,6 +612,7 @@ function renderHierarchy(
 
     // ── Generation label lines ────────────────
     const genLabels = {
+        '-4': 'Great Great Grandparents',
         '-3': 'Great Grandparents',
         '-2': 'Grandparents',
         '-1': 'Parents',
