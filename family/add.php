@@ -191,6 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $myMember['member_id'],
             $new_member_id,
             $db_type
+            $my_relation
         );
 
         $pdo->prepare("
@@ -212,6 +213,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $success      = true;
         $success_name = $full_name;
+        $success_rel  = $relation_options[
+            array_key_first(
+              array_filter(
+                $relation_options,
+                fn($g) => isset($g[$my_relation])
+              )
+            )
+        ][$my_relation] ?? $my_relation;
+
+        $_POST = []; // Clear form data after successful submission
     }
 }
 
@@ -267,22 +278,112 @@ $quarters = getAllQuarters($pdo);
     </div>
   </div>
 
-  <!-- Success -->
+  <!-- Success popup -->
   <?php if ($success): ?>
-    <div class="alert alert-success mb-4">
-      ✓ <strong><?= clean($success_name) ?></strong>
-      has been added to your family tree.
-      <br><br>
-      <a href="<?= SITE_URL ?>/family/add.php"
-         style="color:#00d4ff">
-        Add another relative
-      </a>
-      &nbsp;·&nbsp;
-      <a href="<?= SITE_URL ?>/family/tree.php"
-         style="color:#00d4ff">
-        View family tree
-      </a>
+  <div style="
+    position:fixed;top:0;left:0;
+    width:100%;height:100%;
+    background:rgba(0,0,0,0.75);
+    z-index:9999;
+    display:flex;align-items:center;
+    justify-content:center;padding:1rem;
+  " id="success-overlay">
+    <div style="
+      background:#111127;
+      border:1px solid #1e1e3a;
+      border-radius:16px;
+      padding:3rem 2.5rem;
+      max-width:480px;width:100%;
+      text-align:center;
+      box-shadow:0 24px 80px rgba(0,0,0,0.6);
+    ">
+
+      <!-- Icon -->
+      <div style="
+        width:72px;height:72px;
+        border-radius:50%;
+        background:rgba(0,212,255,0.15);
+        border:2px solid #00d4ff;
+        display:flex;align-items:center;
+        justify-content:center;
+        margin:0 auto 1.5rem;
+      ">
+        <i class="ti ti-check"
+           style="font-size:2rem;
+                  color:#00d4ff"></i>
+      </div>
+
+      <!-- Title -->
+      <h3 style="
+        color:#fff;font-size:1.4rem;
+        font-weight:600;margin-bottom:0.75rem;
+      ">
+        Member Added Successfully
+      </h3>
+
+      <!-- Name -->
+      <p style="
+        color:#00d4ff;font-size:1.1rem;
+        font-weight:500;margin-bottom:0.5rem;
+      ">
+        <?= clean($success_name) ?>
+      </p>
+
+      <!-- Relation -->
+      <?php if (!empty($success_rel)): ?>
+      <p style="
+        color:#888;font-size:0.9rem;
+        margin-bottom:1.5rem;
+      ">
+        Added as your
+        <strong style="color:#aaa">
+          <?= clean($success_rel) ?>
+        </strong>
+      </p>
+      <?php else: ?>
+      <p style="
+        color:#888;font-size:0.9rem;
+        margin-bottom:1.5rem;
+      ">
+        has been added to your family tree
+      </p>
+      <?php endif; ?>
+
+      <!-- Divider -->
+      <div style="
+        border-top:1px solid #1e1e3a;
+        margin-bottom:1.5rem;
+      "></div>
+
+      <!-- Actions -->
+      <div style="
+        display:flex;flex-direction:column;
+        gap:0.75rem;
+      ">
+        <a href="<?= SITE_URL ?>/family/add.php"
+           class="btn btn-primary w-100"
+           style="padding:0.75rem">
+          <i class="ti ti-user-plus me-2"></i>
+          Add Another Relative
+        </a>
+        <a href="<?= SITE_URL ?>/family/tree.php"
+           class="btn btn-outline-light w-100"
+           style="padding:0.75rem">
+          <i class="ti ti-git-fork me-2"></i>
+          View Family Tree
+        </a>
+        <button onclick="
+          document.getElementById(
+            'success-overlay'
+          ).style.display='none'"
+          class="btn btn-link w-100"
+          style="color:#555;font-size:0.85rem">
+          Add another member on this page
+        </button>
+      </div>
+
     </div>
+  </div>
   <?php endif; ?>
 
   <?php foreach ($errors as $e): ?>
