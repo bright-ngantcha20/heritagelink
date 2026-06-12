@@ -1056,23 +1056,14 @@ function genderLabel(label, gender) {
 function getConnectionLabel(conn, viewerId) {
     if (!conn || !conn.member) return '';
 
-    try {
-        const reverseLink = allLinks.find(l => {
-            const src = l.source.id ?? l.source;
-            const tgt = l.target.id ?? l.target;
-            return src === conn.member.id
-                && tgt === viewerId;
-        });
-
-        if (reverseLink) {
-            return reverseLink.label
-                || reverseLink.type
-                || '';
-        }
-        return conn.label || conn.type || '';
-    } catch(e) {
-        return conn.label || conn.type || '';
-    }
+    // conn.label is the label stored on the
+    // forward link FROM the viewer TO this member
+    // This is already correct because connMap
+    // is built from links where src === n.id
+    // So conn.label IS from viewer's perspective
+    if (conn.label) return conn.label;
+    if (conn.type)  return conn.type;
+    return '';
 }
 
 // ── Detail panel ──────────────────────────────
