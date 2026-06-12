@@ -134,10 +134,42 @@ function getUserTree($pdo, $user_id) {
 }
 
 // ── Relationship labels ───────────────────────
-function getRelationLabel($label, $type) {
+function getRelationLabel(
+    $label, $type, $gender = null
+) {
     if (!$label) {
         return ucfirst($type);
     }
+
+    // Gender-specific overrides
+    $male_overrides = [
+        'son_or_daughter'  => 'Son',
+        'father_or_mother' => 'Father',
+        'uncle_or_aunt'    => 'Uncle',
+        'nephew_or_niece'  => 'Nephew',
+        'grandparent'      => 'Grandfather',
+        'great_grandparent'=> 'Great Grandfather',
+        'stepparent'       => 'Stepfather',
+        'stepchild'        => 'Stepson',
+        'sibling'          => 'Brother',
+        'cousin'           => 'Cousin',
+        'relative'         => 'Relative',
+    ];
+
+    $female_overrides = [
+        'son_or_daughter'  => 'Daughter',
+        'father_or_mother' => 'Mother',
+        'uncle_or_aunt'    => 'Aunt',
+        'nephew_or_niece'  => 'Niece',
+        'grandparent'      => 'Grandmother',
+        'great_grandparent'=> 'Great Grandmother',
+        'stepparent'       => 'Stepmother',
+        'stepchild'        => 'Stepdaughter',
+        'sibling'          => 'Sister',
+        'cousin'           => 'Cousin',
+        'relative'         => 'Relative',
+    ];
+
     $labels = [
         'father'               => 'Father',
         'mother'               => 'Mother',
@@ -146,14 +178,10 @@ function getRelationLabel($label, $type) {
         'brother'              => 'Brother',
         'sister'               => 'Sister',
         'spouse'               => 'Spouse',
-        'grandfather_paternal' =>
-            'Grandfather (Father\'s side)',
-        'grandmother_paternal' =>
-            'Grandmother (Father\'s side)',
-        'grandfather_maternal' =>
-            'Grandfather (Mother\'s side)',
-        'grandmother_maternal' =>
-            'Grandmother (Mother\'s side)',
+        'grandfather_paternal' => 'Grandfather (Father\'s side)',
+        'grandmother_paternal' => 'Grandmother (Father\'s side)',
+        'grandfather_maternal' => 'Grandfather (Mother\'s side)',
+        'grandmother_maternal' => 'Grandmother (Mother\'s side)',
         'great_grandfather'    => 'Great Grandfather',
         'great_grandmother'    => 'Great Grandmother',
         'uncle'                => 'Uncle',
@@ -166,7 +194,7 @@ function getRelationLabel($label, $type) {
         'half_brother'         => 'Half Brother',
         'half_sister'          => 'Half Sister',
         'other'                => 'Relative',
-        // Reverse labels
+        // Reverse labels — gender neutral fallbacks
         'son_or_daughter'      => 'Son / Daughter',
         'father_or_mother'     => 'Parent',
         'grandchild'           => 'Grandchild',
@@ -175,11 +203,43 @@ function getRelationLabel($label, $type) {
         'uncle_or_aunt'        => 'Uncle / Aunt',
         'nephew_or_niece'      => 'Nephew / Niece',
         'sibling'              => 'Sibling',
+        'grandparent'          => 'Grandparent',
+        'great_grandparent'    => 'Great Grandparent',
+        'stepparent'           => 'Stepparent',
         'relative'             => 'Relative',
     ];
-    return $labels[$label] ?? ucfirst(
-        str_replace('_', ' ', $label)
-    );
+
+    // If we have a specific label use it directly
+    if (isset($labels[$label])) {
+        $result = $labels[$label];
+    } else {
+        $result = ucfirst(
+            str_replace('_', ' ', $label)
+        );
+    }
+
+    // Apply gender override for ambiguous labels
+    $ambiguous = [
+        'son_or_daughter', 'father_or_mother',
+        'uncle_or_aunt',   'nephew_or_niece',
+        'grandparent',     'great_grandparent',
+        'stepparent',      'stepchild',
+        'sibling',         'cousin',
+        'relative',        'grandchild',
+    ];
+
+    if (in_array($label, $ambiguous)
+        && $gender !== null) {
+        if ($gender === 'male'
+            && isset($male_overrides[$label])) {
+            $result = $male_overrides[$label];
+        } elseif ($gender === 'female'
+            && isset($female_overrides[$label])) {
+            $result = $female_overrides[$label];
+        }
+    }
+
+    return $result;
 }
 
 // ── Save relationship ─────────────────────────

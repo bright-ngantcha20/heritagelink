@@ -1216,9 +1216,10 @@ const uniqueConn = Array.from(connMap.values());
                     </div>
                     <div style="color:#00d4ff;
                                 font-size:0.75rem;">
-                        ${esc(c.label
-                            ? c.label.replace(/_/g,' ')
-                            : c.type)}
+                        ${genderLabel(
+                            c.label || c.type,
+                            c.member.gender
+                          )}
                     </div>
                 </div>
                 <div style="color:#333;font-size:0.8rem">
@@ -1627,6 +1628,83 @@ document.addEventListener('click', (e) => {
         hideSearch();
     }
 });
+
+function genderLabel(label, gender) {
+    if (!label) return '';
+
+    const maleMap = {
+        'son_or_daughter'  : 'Son',
+        'father_or_mother' : 'Father',
+        'uncle_or_aunt'    : 'Uncle',
+        'nephew_or_niece'  : 'Nephew',
+        'grandparent'      : 'Grandfather',
+        'great_grandparent': 'Great Grandfather',
+        'stepparent'       : 'Stepfather',
+        'stepchild'        : 'Stepson',
+        'sibling'          : 'Brother',
+        'grandchild'       : 'Grandson',
+        'relative'         : 'Relative',
+        'cousin'           : 'Cousin',
+    };
+
+    const femaleMap = {
+        'son_or_daughter'  : 'Daughter',
+        'father_or_mother' : 'Mother',
+        'uncle_or_aunt'    : 'Aunt',
+        'nephew_or_niece'  : 'Niece',
+        'grandparent'      : 'Grandmother',
+        'great_grandparent': 'Great Grandmother',
+        'stepparent'       : 'Stepmother',
+        'stepchild'        : 'Stepdaughter',
+        'sibling'          : 'Sister',
+        'grandchild'       : 'Granddaughter',
+        'relative'         : 'Relative',
+        'cousin'           : 'Cousin',
+    };
+
+    const exactMap = {
+        'father'               : 'Father',
+        'mother'               : 'Mother',
+        'son'                  : 'Son',
+        'daughter'             : 'Daughter',
+        'brother'              : 'Brother',
+        'sister'               : 'Sister',
+        'spouse'               : 'Spouse',
+        'grandfather_paternal' : 'Grandfather (Paternal)',
+        'grandmother_paternal' : 'Grandmother (Paternal)',
+        'grandfather_maternal' : 'Grandfather (Maternal)',
+        'grandmother_maternal' : 'Grandmother (Maternal)',
+        'great_grandfather'    : 'Great Grandfather',
+        'great_grandmother'    : 'Great Grandmother',
+        'uncle'                : 'Uncle',
+        'aunt'                 : 'Aunt',
+        'nephew'               : 'Nephew',
+        'niece'                : 'Niece',
+        'cousin'               : 'Cousin',
+        'stepfather'           : 'Stepfather',
+        'stepmother'           : 'Stepmother',
+        'half_brother'         : 'Half Brother',
+        'half_sister'          : 'Half Sister',
+        'grandchild'           : 'Grandchild',
+        'parent'               : 'Parent',
+        'child'                : 'Child',
+        'sibling'              : 'Sibling',
+    };
+
+    // Exact match first
+    if (exactMap[label])
+        return exactMap[label];
+
+    // Gender-specific for ambiguous labels
+    if (gender === 'male' && maleMap[label])
+        return maleMap[label];
+    if (gender === 'female' && femaleMap[label])
+        return femaleMap[label];
+
+    // Fallback
+    return label.replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
 
 loadTree();
 </script>

@@ -171,7 +171,8 @@ $recent = $pdo->query("
             ">
               <?= clean(getRelationLabel(
                 $c['relation_label'] ?? null,
-                $c['relation_type']
+                $c['relation_type'],
+                $c['gender'] ?? null
               )) ?>
             </div>
             <div style="color:#fff;font-size:0.9rem">

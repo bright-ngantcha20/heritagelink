@@ -200,12 +200,22 @@ foreach ($members_raw as $m) {
 // ── Format links for D3.js ────────────────────
 $formatted_links = [];
 foreach ($links as $l) {
-    $formatted_links[] = [
-        'source' => (int)$l['source'],
-        'target' => (int)$l['target'],
-        'type'   => $l['type'],
-        'label'  => $l['label'],
-    ];
+    // Find the target node's gender
+$targetNode = array_filter(
+    $nodes,
+    fn($n) => $n['id'] === (int)$l['target']
+);
+$targetGender = !empty($targetNode)
+    ? array_values($targetNode)[0]['gender']
+    : null;
+
+$formatted_links[] = [
+    'source'        => (int)$l['source'],
+    'target'        => (int)$l['target'],
+    'type'          => $l['type'],
+    'label'         => $l['label'],
+    'target_gender' => $targetGender,
+];
 }
 
 // ── Return the full tree data ─────────────────
