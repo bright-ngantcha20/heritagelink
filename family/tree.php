@@ -345,8 +345,7 @@ $myMember = getUserMember($pdo, $user['id']);
                         background:#111;border:2px dashed #555">
             </div>Deceased
         </div>
-        <div style="border-top:1px solid #1e1e3a;margin:0.5rem 0">
-        </div>
+        <div style="border-top:1px solid #1e1e3a;margin:0.5rem 0"></div>
         <div class="legend-row">
             <div style="width:22px;height:2px;
                         background:#4a90d9"></div>
@@ -497,108 +496,101 @@ function buildAndRender() {
             && visibleNodeIds.has(tgt);
     });
 
+    // ── BFS level assignment ──────────────────
+    // RULE: src → tgt | type
+    // type describes what TGT is to SRC
+    // parent = tgt is ABOVE src (ancestor)
+    // child  = tgt is BELOW src (descendant)
     levelMap = {};
     levelMap[ROOT_ID] = 0;
     const visited = new Set([ROOT_ID]);
     const queue   = [ROOT_ID];
 
     while (queue.length) {
-    const current      = queue.shift();
-    const currentLevel = levelMap[current];
+        const current      = queue.shift();
+        const currentLevel = levelMap[current];
 
-    links.forEach(l => {
-        const src  = l.source.id ?? l.source;
-        const tgt  = l.target.id ?? l.target;
-        const type = l.type;
-        const lbl  = l.label || '';
+        links.forEach(l => {
+            const src  = l.source.id ?? l.source;
+            const tgt  = l.target.id ?? l.target;
+            const type = l.type;
+            const lbl  = l.label || '';
 
-        // ── Rule: current → tgt as PARENT ────
-        // Means: tgt IS the parent of current
-        // → tgt goes ABOVE current
-        if (src === current
-            && type === 'parent'
-            && !visited.has(tgt)) {
-            let offset = -1;
-            if (lbl.includes('grandfather')
-             || lbl.includes('grandmother'))
-                offset = -2;
-            else if (lbl.includes('great_'))
-                offset = -3;
-            levelMap[tgt] = currentLevel + offset;
-            visited.add(tgt);
-            queue.push(tgt);
-        }
-
-        // ── Rule: current → tgt as CHILD ─────
-        // Means: tgt IS the child of current
-        // → tgt goes BELOW current
-        if (src === current
-            && type === 'child'
-            && !visited.has(tgt)) {
-            levelMap[tgt] = currentLevel + 1;
-            visited.add(tgt);
-            queue.push(tgt);
-        }
-
-        // ── Rule: tgt === current, type PARENT
-        // Means: src IS the parent of current
-        // → src goes ABOVE current
-        if (tgt === current
-            && type === 'parent'
-            && !visited.has(src)) {
-            let offset = -1;
-            const lnk = allLinks.find(x =>
-                (x.source.id ?? x.source)
-                    === ROOT_ID
-                && (x.target.id ?? x.target)
-                    === src
-            );
-            const sl = lnk?.label || '';
-            if (sl.includes('grandfather')
-             || sl.includes('grandmother'))
-                offset = -2;
-            else if (sl.includes('great_'))
-                offset = -3;
-            levelMap[src] = currentLevel + offset;
-            visited.add(src);
-            queue.push(src);
-        }
-
-        // ── Rule: tgt === current, type CHILD ─
-        // Means: src IS the child of current
-        // → src goes BELOW current
-        if (tgt === current
-            && type === 'child'
-            && !visited.has(src)) {
-            levelMap[src] = currentLevel + 1;
-            visited.add(src);
-            queue.push(src);
-        }
-
-        // Spouse / sibling → same level
-        if (type === 'spouse'
-            || type === 'sibling') {
-            if (src === current
-                && !visited.has(tgt)) {
-                levelMap[tgt] = currentLevel;
-                visited.add(tgt);
-                queue.push(tgt);
+            // current is the SOURCE
+            if (src === current) {
+                if (!visited.has(tgt)) {
+                    let level;
+                    if (type === 'parent') {
+                        // tgt is current's parent
+                        // → tgt goes ABOVE
+                        let offset = -1;
+                        if (lbl.includes('grandfather')
+                         || lbl.includes('grandmother'))
+                            offset = -2;
+                        else if (lbl.includes('great_'))
+                            offset = -3;
+                        level = currentLevel + offset;
+                    } else if (type === 'child') {
+                        // tgt is current's child
+                        // → tgt goes BELOW
+                        level = currentLevel + 1;
+                    } else {
+                        // spouse / sibling
+                        // → same level
+                        level = currentLevel;
+                    }
+                    levelMap[tgt] = level;
+                    visited.add(tgt);
+                    queue.push(tgt);
+                }
             }
-            if (tgt === current
-                && !visited.has(src)) {
-                levelMap[src] = currentLevel;
-                visited.add(src);
-                queue.push(src);
-            }
-        }
-    });
-}
 
+            // current is the TARGET
+            if (tgt === current) {
+                if (!visited.has(src)) {
+                    let level;
+                    if (type === 'parent') {
+                        // src → current | parent
+                        // means current IS src's parent
+                        // so src is BELOW current
+                        level = currentLevel + 1;
+                    } else if (type === 'child') {
+                        // src → current | child
+                        // means current IS src's child
+                        // so src is ABOVE current
+                        let offset = -1;
+                        const lnk = allLinks.find(x =>
+                            (x.source.id ?? x.source)
+                                === ROOT_ID
+                            && (x.target.id ?? x.target)
+                                === src
+                        );
+                        const sl = lnk?.label || '';
+                        if (sl.includes('grandfather')
+                         || sl.includes('grandmother'))
+                            offset = -2;
+                        else if (sl.includes('great_'))
+                            offset = -3;
+                        level = currentLevel + offset;
+                    } else {
+                        // spouse / sibling
+                        level = currentLevel;
+                    }
+                    levelMap[src] = level;
+                    visited.add(src);
+                    queue.push(src);
+                }
+            }
+        });
+    }
+
+    // Fallback for unvisited nodes
     nodes.forEach(n => {
         if (levelMap[n.id] === undefined)
             levelMap[n.id] = 0;
     });
 
+    // Group nodes by level
     const levels = {};
     nodes.forEach(n => {
         const lv = levelMap[n.id] ?? 0;
@@ -610,6 +602,7 @@ function buildAndRender() {
         .map(Number)
         .sort((a, b) => a - b);
 
+    // Assign x/y positions
     positions = {};
     sortedLevels.forEach(lv => {
         const members = levels[lv];
@@ -697,19 +690,18 @@ function renderAll(nodes, links, sortedLevels) {
             connectedIds.has(src)
             && connectedIds.has(tgt)
         );
-        const opacity =
-            isActive ? 0.75 : 0.06;
-        const strokeW =
-            isActive ? 2 : 1;
+        const opacity = isActive ? 0.75 : 0.06;
+        const strokeW = isActive ? 2 : 1;
 
         if (l.type === 'parent') {
+            // Draw from ancestor down to descendant
             let pAnc, pDesc;
             if (lvSrc < lvTgt) {
                 pAnc = p1; pDesc = p2;
             } else if (lvTgt < lvSrc) {
                 pAnc = p2; pDesc = p1;
             } else {
-                return;
+                return; // same level, skip
             }
 
             const x1   = pAnc.x;
@@ -767,9 +759,7 @@ function renderAll(nodes, links, sortedLevels) {
         const isRoot     = n.id === ROOT_ID;
         const isSelected = n.id === selectedId;
         const isConn     =
-            !hasSelection
-            || connectedIds.has(n.id);
-
+            !hasSelection || connectedIds.has(n.id);
         const nodeOpacity = isConn ? 1.0 : 0.15;
 
         const accentColor =
@@ -797,7 +787,7 @@ function renderAll(nodes, links, sortedLevels) {
                 onNodeClick(n);
             });
 
-        // Glow ring for selected node
+        // Glow ring for selected
         if (isSelected) {
             ng.append('rect')
                 .attr('x',  -CW/2 - 5)
@@ -851,13 +841,12 @@ function renderAll(nodes, links, sortedLevels) {
             .attr('fill',
                 isRoot        ? '#1a2a5e' :
                 n.is_deceased ? '#1a1a1a' :
-                n.gender === 'female'
-                              ? '#2e0d2e' :
+                n.gender === 'female' ? '#2e0d2e' :
                 '#0d1e3a')
             .attr('stroke', accentColor)
             .attr('stroke-width', 1.5);
 
-        // Initial
+        // Initial letter
         ng.append('text')
             .attr('x', -CW/2 + 24).attr('y', 5)
             .attr('text-anchor', 'middle')
@@ -867,10 +856,10 @@ function renderAll(nodes, links, sortedLevels) {
             .attr('fill', accentColor)
             .text(n.name.charAt(0).toUpperCase());
 
-        // Name
-        const dName = n.name;
-        const tName = dName.length > 11
-            ? dName.substring(0, 10) + '…' : dName;
+        // Full name (never nickname)
+        const tName = n.name.length > 11
+            ? n.name.substring(0, 10) + '…'
+            : n.name;
 
         ng.append('text')
             .attr('x', -CW/2 + 47)
@@ -886,8 +875,7 @@ function renderAll(nodes, links, sortedLevels) {
             ng.append('text')
                 .attr('x', -CW/2 + 47).attr('y', 4)
                 .attr('font-size', '9px')
-                .attr('font-family',
-                      'Segoe UI, sans-serif')
+                .attr('font-family', 'Segoe UI, sans-serif')
                 .attr('fill', '#666')
                 .text(n.date_range);
         }
@@ -898,8 +886,7 @@ function renderAll(nodes, links, sortedLevels) {
                 .attr('x', -CW/2 + 47)
                 .attr('y', n.date_range ? 18 : 17)
                 .attr('font-size', '8.5px')
-                .attr('font-family',
-                      'Segoe UI, sans-serif')
+                .attr('font-family', 'Segoe UI, sans-serif')
                 .attr('fill',
                     n.quarter_id ? '#00d4ff' : '#777')
                 .attr('opacity', 0.85)
@@ -914,8 +901,7 @@ function renderAll(nodes, links, sortedLevels) {
                 .attr('x',  CW/2 - 34)
                 .attr('y', -CH/2 + 3)
                 .attr('width', 30).attr('height', 15)
-                .attr('rx', 4)
-                .attr('fill', '#00d4ff');
+                .attr('rx', 4).attr('fill', '#00d4ff');
 
             ng.append('text')
                 .attr('x', CW/2 - 19)
@@ -923,8 +909,7 @@ function renderAll(nodes, links, sortedLevels) {
                 .attr('text-anchor', 'middle')
                 .attr('font-size', '8px')
                 .attr('font-weight', '800')
-                .attr('font-family',
-                      'Segoe UI, sans-serif')
+                .attr('font-family', 'Segoe UI, sans-serif')
                 .attr('fill', '#000')
                 .text('YOU');
         }
@@ -958,7 +943,7 @@ function renderAll(nodes, links, sortedLevels) {
                 .text('†');
         }
 
-        // Expand indicator (+)
+        // Expand indicator
         const hasHidden = allLinks.some(l => {
             const src = l.source.id ?? l.source;
             const tgt = l.target.id ?? l.target;
@@ -981,8 +966,7 @@ function renderAll(nodes, links, sortedLevels) {
                 .attr('text-anchor', 'middle')
                 .attr('font-size', '11px')
                 .attr('font-weight', '700')
-                .attr('font-family',
-                      'Segoe UI, sans-serif')
+                .attr('font-family', 'Segoe UI, sans-serif')
                 .attr('fill', '#00d4ff')
                 .text('+');
         }
@@ -1031,7 +1015,7 @@ function onNodeClick(n) {
     }
 }
 
-// ── Center on a node ──────────────────────────
+// ── Center on node ────────────────────────────
 function centerOnNode(nodeId) {
     const pos = positions[nodeId];
     if (!pos) return;
@@ -1058,40 +1042,27 @@ function showDetail(n) {
         n.gender === 'female' ? '#d94a8a' :
         '#4a90d9';
 
-    // Build unique connections list
+    // Build connections — use reverse link label
+    // so we show what the other person IS to viewer
     const connMap = new Map();
-allLinks.forEach(l => {
-    const src = l.source.id ?? l.source;
-    const tgt = l.target.id ?? l.target;
-
-    // Only process links WHERE this node
-    // is the SOURCE (member_id_1)
-    // This gives us the relationship
-    // FROM this node's perspective
-    if (src !== n.id) return;
-
-    const other = allNodes.find(
-        x => x.id === tgt
-    );
-    if (!other) return;
-
-    // If we already have this person
-    // keep the one with a specific label
-    if (!connMap.has(tgt)
-        || l.label) {
-        connMap.set(tgt, {
-            member: other,
-            type:   l.type,
-            label:  l.label,
-        });
-    }
-});
-
-const uniqueConn = Array.from(connMap.values());
+    allLinks.forEach(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        if (src !== n.id) return;
+        const other = allNodes.find(x => x.id === tgt);
+        if (!other) return;
+        if (!connMap.has(tgt) || l.label) {
+            connMap.set(tgt, {
+                member: other,
+                type:   l.type,
+                label:  l.label,
+            });
+        }
+    });
+    const uniqueConn = Array.from(connMap.values());
 
     document.getElementById('panel-content')
         .innerHTML = `
-
         <div style="text-align:center;
                     margin-bottom:1.25rem">
             <div style="
@@ -1106,8 +1077,7 @@ const uniqueConn = Array.from(connMap.values());
                 justify-content:center;
                 font-size:1.3rem;font-weight:700;
                 color:${gc};
-                margin:0 auto 0.75rem;
-            ">
+                margin:0 auto 0.75rem;">
                 ${n.name.charAt(0).toUpperCase()}
             </div>
             <h4 style="color:#fff;font-size:1rem;
@@ -1119,52 +1089,42 @@ const uniqueConn = Array.from(connMap.values());
                         margin-bottom:5px">
                 "${esc(n.preferred_name)}"
             </div>` : ''}
-            <div style="
-                display:inline-block;
-                background:rgba(0,212,255,0.1);
-                border:1px solid rgba(0,212,255,0.2);
-                color:#00d4ff;font-size:0.72rem;
-                padding:2px 10px;border-radius:20px;
-            ">
+            <div style="display:inline-block;
+                        background:rgba(0,212,255,0.1);
+                        border:1px solid rgba(0,212,255,0.2);
+                        color:#00d4ff;font-size:0.72rem;
+                        padding:2px 10px;border-radius:20px;">
                 ${esc(n.quarter || 'Unknown')}
             </div>
             ${n.is_deceased ? `
             <div style="color:#555;font-size:0.78rem;
-                        margin-top:5px">† Deceased
-            </div>` : ''}
+                        margin-top:5px">† Deceased</div>` : ''}
             ${n.verified ? `
             <div style="color:#00d4ff;font-size:0.75rem;
-                        margin-top:3px">✓ Verified
-            </div>` : ''}
+                        margin-top:3px">✓ Verified</div>` : ''}
         </div>
 
-        ${(n.date_range || n.birthplace
-           || n.occupation) ? `
+        ${(n.date_range || n.birthplace || n.occupation) ? `
         <div style="background:#0d0d1a;
                     border:1px solid #1e1e3a;
                     border-radius:10px;
                     padding:0.85rem 1rem;
                     margin-bottom:1rem;">
             ${n.date_range ? `
-            <div style="display:flex;gap:8px;
-                        margin-bottom:0.5rem">
-                <span style="color:#555;font-size:0.8rem">
-                    📅</span>
+            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
+                <span style="color:#555;font-size:0.8rem">📅</span>
                 <span style="color:#aaa;font-size:0.82rem">
                     ${esc(n.date_range)}</span>
             </div>` : ''}
             ${n.birthplace ? `
-            <div style="display:flex;gap:8px;
-                        margin-bottom:0.5rem">
-                <span style="color:#555;font-size:0.8rem">
-                    📍</span>
+            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
+                <span style="color:#555;font-size:0.8rem">📍</span>
                 <span style="color:#aaa;font-size:0.82rem">
                     ${esc(n.birthplace)}</span>
             </div>` : ''}
             ${n.occupation ? `
             <div style="display:flex;gap:8px">
-                <span style="color:#555;font-size:0.8rem">
-                    💼</span>
+                <span style="color:#555;font-size:0.8rem">💼</span>
                 <span style="color:#aaa;font-size:0.82rem">
                     ${esc(n.occupation)}</span>
             </div>` : ''}
@@ -1180,12 +1140,10 @@ const uniqueConn = Array.from(connMap.values());
 
         ${uniqueConn.length ? `
         <div style="margin-bottom:1rem">
-            <div style="font-size:0.72rem;
-                        font-weight:600;
+            <div style="font-size:0.72rem;font-weight:600;
                         text-transform:uppercase;
                         letter-spacing:0.06em;
-                        color:#555;
-                        margin-bottom:0.6rem;">
+                        color:#555;margin-bottom:0.6rem;">
                 Connections
             </div>
             ${uniqueConn.map(c => `
@@ -1196,36 +1154,29 @@ const uniqueConn = Array.from(connMap.values());
                         gap:0.6rem;padding:0.5rem 0;
                         border-bottom:1px solid #1a1a2e;
                         cursor:pointer;">
-                <div style="
-                    width:30px;height:30px;
-                    border-radius:50%;
-                    background:#1e1e3a;
-                    display:flex;align-items:center;
-                    justify-content:center;
-                    font-size:0.85rem;font-weight:700;
-                    color:#00d4ff;flex-shrink:0;">
-                    ${c.member.name.charAt(0)
-                        .toUpperCase()}
+                <div style="width:30px;height:30px;
+                            border-radius:50%;
+                            background:#1e1e3a;
+                            display:flex;align-items:center;
+                            justify-content:center;
+                            font-size:0.85rem;font-weight:700;
+                            color:#00d4ff;flex-shrink:0;">
+                    ${c.member.name.charAt(0).toUpperCase()}
                 </div>
                 <div style="flex:1;min-width:0">
-                    <div style="color:#ddd;
-                                font-size:0.85rem;
-                                white-space:nowrap;
-                                overflow:hidden;
+                    <div style="color:#ddd;font-size:0.85rem;
+                                white-space:nowrap;overflow:hidden;
                                 text-overflow:ellipsis;">
                         ${esc(c.member.name)}
                     </div>
-                    <div style="color:#00d4ff;
-                                font-size:0.75rem;">
+                    <div style="color:#00d4ff;font-size:0.75rem;">
                         ${genderLabel(
                             getConnectionLabel(c, n.id),
                             c.member.gender
-                          )}
+                        )}
                     </div>
                 </div>
-                <div style="color:#333;font-size:0.8rem">
-                    ›
-                </div>
+                <div style="color:#333;font-size:0.8rem">›</div>
             </div>`).join('')}
         </div>` : ''}
 
@@ -1235,26 +1186,24 @@ const uniqueConn = Array.from(connMap.values());
             <button onclick="alert('Messaging coming soon')"
                     style="background:#00d4ff;border:none;
                            color:#000;padding:0.65rem;
-                           border-radius:8px;
-                           font-size:0.85rem;
-                           font-weight:600;
-                           cursor:pointer;width:100%;">
+                           border-radius:8px;font-size:0.85rem;
+                           font-weight:600;cursor:pointer;
+                           width:100%;">
                 💬 Send Message
             </button>` : `
             <div style="background:rgba(0,212,255,0.06);
                         border:1px solid rgba(0,212,255,0.15);
                         border-radius:8px;padding:0.65rem;
-                        text-align:center;
-                        color:#00d4ff;font-size:0.82rem;">
+                        text-align:center;color:#00d4ff;
+                        font-size:0.82rem;">
                 This is your profile node
             </div>`}
             <a href="${SITE_URL}/family/add.php"
                style="background:#1e1e3a;
                       border:1px solid #2a2a4a;
                       color:#aaa;padding:0.65rem;
-                      border-radius:8px;
-                      font-size:0.85rem;display:block;
-                      text-align:center;
+                      border-radius:8px;font-size:0.85rem;
+                      display:block;text-align:center;
                       text-decoration:none;">
                 + Add Their Relative
             </a>
@@ -1301,8 +1250,7 @@ function resetView() {
 function toggleLegend() {
     const l = document.getElementById('tree-legend');
     l.style.display =
-        l.style.display === 'block'
-        ? 'none' : 'block';
+        l.style.display === 'block' ? 'none' : 'block';
 }
 
 function showEmpty() {
@@ -1322,6 +1270,97 @@ function esc(str) {
         .replace(/'/g,  '&#39;');
 }
 
+// ── Gender-aware label ────────────────────────
+function genderLabel(label, gender) {
+    if (!label) return '';
+
+    const exactMap = {
+        'father'               : 'Father',
+        'mother'               : 'Mother',
+        'son'                  : 'Son',
+        'daughter'             : 'Daughter',
+        'brother'              : 'Brother',
+        'sister'               : 'Sister',
+        'spouse'               : 'Spouse',
+        'grandfather_paternal' : 'Grandfather (Paternal)',
+        'grandmother_paternal' : 'Grandmother (Paternal)',
+        'grandfather_maternal' : 'Grandfather (Maternal)',
+        'grandmother_maternal' : 'Grandmother (Maternal)',
+        'great_grandfather'    : 'Great Grandfather',
+        'great_grandmother'    : 'Great Grandmother',
+        'uncle'                : 'Uncle',
+        'aunt'                 : 'Aunt',
+        'nephew'               : 'Nephew',
+        'niece'                : 'Niece',
+        'cousin'               : 'Cousin',
+        'stepfather'           : 'Stepfather',
+        'stepmother'           : 'Stepmother',
+        'half_brother'         : 'Half Brother',
+        'half_sister'          : 'Half Sister',
+        'parent'               : 'Parent',
+        'child'                : 'Child',
+        'sibling'              : 'Sibling',
+        'grandchild'           : 'Grandchild',
+    };
+
+    if (exactMap[label]) return exactMap[label];
+
+    const maleMap = {
+        'son_or_daughter'   : 'Son',
+        'father_or_mother'  : 'Father',
+        'uncle_or_aunt'     : 'Uncle',
+        'nephew_or_niece'   : 'Nephew',
+        'grandparent'       : 'Grandfather',
+        'great_grandparent' : 'Great Grandfather',
+        'stepparent'        : 'Stepfather',
+        'stepchild'         : 'Stepson',
+        'sibling'           : 'Brother',
+        'grandchild'        : 'Grandson',
+        'relative'          : 'Relative',
+    };
+
+    const femaleMap = {
+        'son_or_daughter'   : 'Daughter',
+        'father_or_mother'  : 'Mother',
+        'uncle_or_aunt'     : 'Aunt',
+        'nephew_or_niece'   : 'Niece',
+        'grandparent'       : 'Grandmother',
+        'great_grandparent' : 'Great Grandmother',
+        'stepparent'        : 'Stepmother',
+        'stepchild'         : 'Stepdaughter',
+        'sibling'           : 'Sister',
+        'grandchild'        : 'Granddaughter',
+        'relative'          : 'Relative',
+    };
+
+    if (gender === 'male' && maleMap[label])
+        return maleMap[label];
+    if (gender === 'female' && femaleMap[label])
+        return femaleMap[label];
+
+    return label.replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Get correct label from viewer's perspective
+function getConnectionLabel(conn, viewerId) {
+    // Find the reverse link:
+    // from the other member BACK to the viewer
+    // This tells us what the other person IS
+    // to the viewer
+    const reverseLink = allLinks.find(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        return src === conn.member.id
+            && tgt === viewerId;
+    });
+
+    if (reverseLink) {
+        return reverseLink.label || reverseLink.type;
+    }
+    return conn.label || conn.type;
+}
+
 // ── Search ────────────────────────────────────
 let searchTimer = null;
 
@@ -1330,7 +1369,7 @@ function onSearchInput(val) {
         document.getElementById('search-clear');
     const wrapper =
         document.getElementById('search-wrapper');
-    clear.style.display  = val ? 'block' : 'none';
+    clear.style.display = val ? 'block' : 'none';
     wrapper.style.borderColor =
         val ? '#00d4ff' : '#1e1e3a';
     clearTimeout(searchTimer);
@@ -1361,10 +1400,8 @@ async function doSearch(query) {
         renderSearchResults(data, query);
     } catch(e) {
         box.innerHTML = `
-            <div style="padding:1rem;
-                        text-align:center;
-                        color:#ff6b6b;
-                        font-size:0.82rem;">
+            <div style="padding:1rem;text-align:center;
+                        color:#ff6b6b;font-size:0.82rem;">
                 Search failed. Try again.
             </div>`;
     }
@@ -1380,8 +1417,7 @@ function renderSearchResults(data, query) {
                         text-align:center;color:#555;">
                 <div style="font-size:1.5rem;
                             margin-bottom:0.5rem">🔍</div>
-                <div style="font-size:0.85rem;
-                            color:#888;">
+                <div style="font-size:0.85rem;color:#888;">
                     No results for
                     "<strong style="color:#aaa">
                         ${esc(query)}
@@ -1397,19 +1433,14 @@ function renderSearchResults(data, query) {
                     font-size:0.75rem;color:#555;">
             ${data.total} result${
                 data.total !== 1 ? 's' : ''
-            } for
-            "<strong style="color:#888">
+            } for "<strong style="color:#888">
                 ${esc(query)}
             </strong>"
         </div>`;
 
     const items = data.results.map(r => {
-        const gc =
-            r.gender === 'female'
+        const gc = r.gender === 'female'
             ? '#d94a8a' : '#4a90d9';
-        const safeR = JSON.stringify(r)
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'");
         return `
         <div onclick='selectSearchResult(${
                 JSON.stringify(r)
@@ -1420,27 +1451,25 @@ function renderSearchResults(data, query) {
                     border-bottom:1px solid #0d0d1a;"
              onmouseover="this.style.background='#1a1a2e'"
              onmouseout="this.style.background='transparent'">
-            <div style="
-                width:38px;height:38px;
-                border-radius:50%;flex-shrink:0;
-                background:${r.gender === 'female'
-                    ? '#2e0d2e' : '#0d1e3a'};
-                border:1.5px solid ${
-                    r.is_deceased ? '#444' : gc};
-                ${r.is_deceased
-                    ? 'border-style:dashed;' : ''}
-                display:flex;align-items:center;
-                justify-content:center;
-                font-size:0.9rem;font-weight:700;
-                color:${r.is_deceased ? '#444' : gc};">
+            <div style="width:38px;height:38px;
+                        border-radius:50%;flex-shrink:0;
+                        background:${r.gender === 'female'
+                            ? '#2e0d2e' : '#0d1e3a'};
+                        border:1.5px solid ${
+                            r.is_deceased ? '#444' : gc};
+                        ${r.is_deceased
+                            ? 'border-style:dashed;' : ''}
+                        display:flex;align-items:center;
+                        justify-content:center;
+                        font-size:0.9rem;font-weight:700;
+                        color:${r.is_deceased
+                            ? '#444' : gc};">
                 ${r.full_name.charAt(0).toUpperCase()}
             </div>
             <div style="flex:1;min-width:0">
                 <div style="color:#fff;font-size:0.88rem;
-                            font-weight:500;
-                            white-space:nowrap;
-                            overflow:hidden;
-                            text-overflow:ellipsis;">
+                            font-weight:500;white-space:nowrap;
+                            overflow:hidden;text-overflow:ellipsis;">
                     ${esc(r.full_name)}
                     ${r.verified
                         ? '<span style="background:#00d4ff;color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;">✓</span>'
@@ -1449,23 +1478,23 @@ function renderSearchResults(data, query) {
                         ? '<span style="color:#555;font-size:10px">†</span>'
                         : ''}
                 </div>
-                <div style="display:flex;
-                            align-items:center;
+                <div style="display:flex;align-items:center;
                             gap:6px;margin-top:2px;">
-                    <span style="
-                        background:rgba(0,212,255,0.1);
-                        border:1px solid rgba(0,212,255,0.2);
-                        color:#00d4ff;font-size:0.7rem;
-                        padding:1px 6px;
-                        border-radius:10px;">
+                    <span style="background:rgba(0,212,255,0.1);
+                                 border:1px solid rgba(0,212,255,0.2);
+                                 color:#00d4ff;font-size:0.7rem;
+                                 padding:1px 6px;border-radius:10px;">
                         ${esc(r.quarter || 'Unknown')}
                     </span>
                     ${r.date_range
-                        ? `<span style="color:#555;font-size:0.75rem">${esc(r.date_range)}</span>`
+                        ? `<span style="color:#555;font-size:0.75rem">
+                               ${esc(r.date_range)}</span>`
                         : ''}
                 </div>
                 ${r.occupation
-                    ? `<div style="color:#666;font-size:0.75rem;margin-top:1px">${esc(r.occupation)}</div>`
+                    ? `<div style="color:#666;font-size:0.75rem;
+                                   margin-top:1px">
+                           ${esc(r.occupation)}</div>`
                     : ''}
             </div>
             ${r.has_account
@@ -1483,38 +1512,32 @@ function selectSearchResult(member) {
 }
 
 function showSearchedMember(m) {
-    const gc =
-        m.gender === 'female'
+    const gc = m.gender === 'female'
         ? '#d94a8a' : '#4a90d9';
 
     document.getElementById('panel-content')
         .innerHTML = `
         <div style="background:rgba(0,212,255,0.06);
                     border:1px solid rgba(0,212,255,0.15);
-                    border-radius:8px;
-                    padding:0.5rem 0.75rem;
+                    border-radius:8px;padding:0.5rem 0.75rem;
                     font-size:0.75rem;color:#888;
                     margin-bottom:1rem;">
             <i class="ti ti-search"
-               style="color:#00d4ff;
-                      margin-right:4px"></i>
+               style="color:#00d4ff;margin-right:4px"></i>
             Community search result
         </div>
-        <div style="text-align:center;
-                    margin-bottom:1.25rem">
-            <div style="
-                width:58px;height:58px;
-                border-radius:50%;
-                background:${m.gender === 'female'
-                    ? '#2e0d2e' : '#0d1e3a'};
-                border:2px solid ${gc};
-                ${m.is_deceased
-                    ? 'border-style:dashed;' : ''}
-                display:flex;align-items:center;
-                justify-content:center;
-                font-size:1.3rem;font-weight:700;
-                color:${gc};
-                margin:0 auto 0.75rem;">
+        <div style="text-align:center;margin-bottom:1.25rem">
+            <div style="width:58px;height:58px;
+                        border-radius:50%;
+                        background:${m.gender === 'female'
+                            ? '#2e0d2e' : '#0d1e3a'};
+                        border:2px solid ${gc};
+                        ${m.is_deceased
+                            ? 'border-style:dashed;' : ''}
+                        display:flex;align-items:center;
+                        justify-content:center;
+                        font-size:1.3rem;font-weight:700;
+                        color:${gc};margin:0 auto 0.75rem;">
                 ${m.full_name.charAt(0).toUpperCase()}
             </div>
             <h4 style="color:#fff;font-size:1rem;
@@ -1530,37 +1553,28 @@ function showSearchedMember(m) {
                         background:rgba(0,212,255,0.1);
                         border:1px solid rgba(0,212,255,0.2);
                         color:#00d4ff;font-size:0.72rem;
-                        padding:2px 10px;
-                        border-radius:20px;">
+                        padding:2px 10px;border-radius:20px;">
                 ${esc(m.quarter || 'Unknown')}
             </div>
             ${m.is_deceased ? `
             <div style="color:#555;font-size:0.78rem;
-                        margin-top:5px">† Deceased
-            </div>` : ''}
+                        margin-top:5px">† Deceased</div>` : ''}
             ${m.verified ? `
             <div style="color:#00d4ff;font-size:0.75rem;
-                        margin-top:3px">
-                ✓ Verified record
-            </div>` : ''}
+                        margin-top:3px">✓ Verified record</div>` : ''}
         </div>
-        ${(m.date_range || m.birthplace
-           || m.occupation) ? `
-        <div style="background:#0d0d1a;
-                    border:1px solid #1e1e3a;
-                    border-radius:10px;
-                    padding:0.85rem 1rem;
+        ${(m.date_range || m.birthplace || m.occupation) ? `
+        <div style="background:#0d0d1a;border:1px solid #1e1e3a;
+                    border-radius:10px;padding:0.85rem 1rem;
                     margin-bottom:1rem;">
             ${m.date_range ? `
-            <div style="display:flex;gap:8px;
-                        margin-bottom:0.5rem">
+            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
                 <span style="color:#555;font-size:0.8rem">📅</span>
                 <span style="color:#aaa;font-size:0.82rem">
                     ${esc(m.date_range)}</span>
             </div>` : ''}
             ${m.birthplace ? `
-            <div style="display:flex;gap:8px;
-                        margin-bottom:0.5rem">
+            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
                 <span style="color:#555;font-size:0.8rem">📍</span>
                 <span style="color:#aaa;font-size:0.82rem">
                     ${esc(m.birthplace)}</span>
@@ -1572,23 +1586,19 @@ function showSearchedMember(m) {
                     ${esc(m.occupation)}</span>
             </div>` : ''}
         </div>` : ''}
-        <div style="display:flex;flex-direction:column;
-                    gap:0.5rem;">
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
             <button onclick="alert('Messaging coming soon')"
-                    style="background:#00d4ff;border:none;
-                           color:#000;padding:0.65rem;
-                           border-radius:8px;
+                    style="background:#00d4ff;border:none;color:#000;
+                           padding:0.65rem;border-radius:8px;
                            font-size:0.85rem;font-weight:600;
                            cursor:pointer;width:100%;">
                 💬 Send Message
             </button>
             <a href="${SITE_URL}/family/add.php"
-               style="background:#1e1e3a;
-                      border:1px solid #2a2a4a;
-                      color:#aaa;padding:0.65rem;
-                      border-radius:8px;font-size:0.85rem;
-                      display:block;text-align:center;
-                      text-decoration:none;">
+               style="background:#1e1e3a;border:1px solid #2a2a4a;
+                      color:#aaa;padding:0.65rem;border-radius:8px;
+                      font-size:0.85rem;display:block;
+                      text-align:center;text-decoration:none;">
                 + Add as Family Member
             </a>
         </div>
@@ -1629,107 +1639,6 @@ document.addEventListener('click', (e) => {
         hideSearch();
     }
 });
-
-function genderLabel(label, gender) {
-    if (!label) return '';
-
-    const maleMap = {
-        'son_or_daughter'  : 'Son',
-        'father_or_mother' : 'Father',
-        'uncle_or_aunt'    : 'Uncle',
-        'nephew_or_niece'  : 'Nephew',
-        'grandparent'      : 'Grandfather',
-        'great_grandparent': 'Great Grandfather',
-        'stepparent'       : 'Stepfather',
-        'stepchild'        : 'Stepson',
-        'sibling'          : 'Brother',
-        'grandchild'       : 'Grandson',
-        'relative'         : 'Relative',
-        'cousin'           : 'Cousin',
-    };
-
-    const femaleMap = {
-        'son_or_daughter'  : 'Daughter',
-        'father_or_mother' : 'Mother',
-        'uncle_or_aunt'    : 'Aunt',
-        'nephew_or_niece'  : 'Niece',
-        'grandparent'      : 'Grandmother',
-        'great_grandparent': 'Great Grandmother',
-        'stepparent'       : 'Stepmother',
-        'stepchild'        : 'Stepdaughter',
-        'sibling'          : 'Sister',
-        'grandchild'       : 'Granddaughter',
-        'relative'         : 'Relative',
-        'cousin'           : 'Cousin',
-    };
-
-    const exactMap = {
-        'father'               : 'Father',
-        'mother'               : 'Mother',
-        'son'                  : 'Son',
-        'daughter'             : 'Daughter',
-        'brother'              : 'Brother',
-        'sister'               : 'Sister',
-        'spouse'               : 'Spouse',
-        'grandfather_paternal' : 'Grandfather (Paternal)',
-        'grandmother_paternal' : 'Grandmother (Paternal)',
-        'grandfather_maternal' : 'Grandfather (Maternal)',
-        'grandmother_maternal' : 'Grandmother (Maternal)',
-        'great_grandfather'    : 'Great Grandfather',
-        'great_grandmother'    : 'Great Grandmother',
-        'uncle'                : 'Uncle',
-        'aunt'                 : 'Aunt',
-        'nephew'               : 'Nephew',
-        'niece'                : 'Niece',
-        'cousin'               : 'Cousin',
-        'stepfather'           : 'Stepfather',
-        'stepmother'           : 'Stepmother',
-        'half_brother'         : 'Half Brother',
-        'half_sister'          : 'Half Sister',
-        'grandchild'           : 'Grandchild',
-        'parent'               : 'Parent',
-        'child'                : 'Child',
-        'sibling'              : 'Sibling',
-    };
-
-    // Exact match first
-    if (exactMap[label])
-        return exactMap[label];
-
-    // Gender-specific for ambiguous labels
-    if (gender === 'male' && maleMap[label])
-        return maleMap[label];
-    if (gender === 'female' && femaleMap[label])
-        return femaleMap[label];
-
-    // Fallback
-    return label.replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function getConnectionLabel(conn, viewerId) {
-    // We want to show what THIS person is
-    // to the VIEWER
-    // e.g. if viewer is child of Takem Tabi
-    // show Takem Tabi as "Father" not "Son"
-
-    // Find the reverse link
-    // (from the other member back to viewer)
-    const reverseLink = allLinks.find(l => {
-        const src = l.source.id ?? l.source;
-        const tgt = l.target.id ?? l.target;
-        return src === conn.member.id
-            && tgt === viewerId;
-    });
-
-    if (reverseLink) {
-        return reverseLink.label
-            || reverseLink.type;
-    }
-
-    // Fallback to forward label
-    return conn.label || conn.type;
-}
 
 loadTree();
 </script>
