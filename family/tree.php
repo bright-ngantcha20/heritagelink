@@ -503,95 +503,96 @@ function buildAndRender() {
     const queue   = [ROOT_ID];
 
     while (queue.length) {
-        const current      = queue.shift();
-        const currentLevel = levelMap[current];
+    const current      = queue.shift();
+    const currentLevel = levelMap[current];
 
-        links.forEach(l => {
-            const src  = l.source.id ?? l.source;
-            const tgt  = l.target.id ?? l.target;
-            const type = l.type;
-            const lbl  = l.label || '';
+    links.forEach(l => {
+        const src  = l.source.id ?? l.source;
+        const tgt  = l.target.id ?? l.target;
+        const type = l.type;
+        const lbl  = l.label || '';
 
-            // current → tgt as parent
-            // means tgt is ABOVE current
+        // ── Rule: current → tgt as PARENT ────
+        // Means: tgt IS the parent of current
+        // → tgt goes ABOVE current
+        if (src === current
+            && type === 'parent'
+            && !visited.has(tgt)) {
+            let offset = -1;
+            if (lbl.includes('grandfather')
+             || lbl.includes('grandmother'))
+                offset = -2;
+            else if (lbl.includes('great_'))
+                offset = -3;
+            levelMap[tgt] = currentLevel + offset;
+            visited.add(tgt);
+            queue.push(tgt);
+        }
+
+        // ── Rule: current → tgt as CHILD ─────
+        // Means: tgt IS the child of current
+        // → tgt goes BELOW current
+        if (src === current
+            && type === 'child'
+            && !visited.has(tgt)) {
+            levelMap[tgt] = currentLevel + 1;
+            visited.add(tgt);
+            queue.push(tgt);
+        }
+
+        // ── Rule: tgt === current, type PARENT
+        // Means: src IS the parent of current
+        // → src goes ABOVE current
+        if (tgt === current
+            && type === 'parent'
+            && !visited.has(src)) {
+            let offset = -1;
+            const lnk = allLinks.find(x =>
+                (x.source.id ?? x.source)
+                    === ROOT_ID
+                && (x.target.id ?? x.target)
+                    === src
+            );
+            const sl = lnk?.label || '';
+            if (sl.includes('grandfather')
+             || sl.includes('grandmother'))
+                offset = -2;
+            else if (sl.includes('great_'))
+                offset = -3;
+            levelMap[src] = currentLevel + offset;
+            visited.add(src);
+            queue.push(src);
+        }
+
+        // ── Rule: tgt === current, type CHILD ─
+        // Means: src IS the child of current
+        // → src goes BELOW current
+        if (tgt === current
+            && type === 'child'
+            && !visited.has(src)) {
+            levelMap[src] = currentLevel + 1;
+            visited.add(src);
+            queue.push(src);
+        }
+
+        // Spouse / sibling → same level
+        if (type === 'spouse'
+            || type === 'sibling') {
             if (src === current
-                && type === 'parent'
                 && !visited.has(tgt)) {
-                let offset = -1;
-                if (lbl.includes('grandfather')
-                 || lbl.includes('grandmother'))
-                    offset = -2;
-                else if (lbl.includes('great_'))
-                    offset = -3;
-                levelMap[tgt] =
-                    currentLevel + offset;
+                levelMap[tgt] = currentLevel;
                 visited.add(tgt);
                 queue.push(tgt);
             }
-
-            // current → tgt as child
-            // means tgt is BELOW current
-            if (src === current
-                && type === 'child'
-                && !visited.has(tgt)) {
-                levelMap[tgt] = currentLevel + 1;
-                visited.add(tgt);
-                queue.push(tgt);
-            }
-
-            // tgt === current, type child
-            // src is BELOW current
             if (tgt === current
-                && type === 'child'
                 && !visited.has(src)) {
-                levelMap[src] = currentLevel + 1;
+                levelMap[src] = currentLevel;
                 visited.add(src);
                 queue.push(src);
             }
-
-            // tgt === current, type parent
-            // src is ABOVE current
-            if (tgt === current
-                && type === 'parent'
-                && !visited.has(src)) {
-                const rootToSrc = allLinks.find(x =>
-                    (x.source.id ?? x.source)
-                        === ROOT_ID
-                    && (x.target.id ?? x.target)
-                        === src
-                );
-                const srcLbl =
-                    rootToSrc?.label || '';
-                let offset = -1;
-                if (srcLbl.includes('grandfather')
-                 || srcLbl.includes('grandmother'))
-                    offset = -2;
-                else if (srcLbl.includes('great_'))
-                    offset = -3;
-                levelMap[src] =
-                    currentLevel + offset;
-                visited.add(src);
-                queue.push(src);
-            }
-
-            // Spouse / sibling → same level
-            if (type === 'spouse'
-                || type === 'sibling') {
-                if (src === current
-                    && !visited.has(tgt)) {
-                    levelMap[tgt] = currentLevel;
-                    visited.add(tgt);
-                    queue.push(tgt);
-                }
-                if (tgt === current
-                    && !visited.has(src)) {
-                    levelMap[src] = currentLevel;
-                    visited.add(src);
-                    queue.push(src);
-                }
-            }
-        });
-    }
+        }
+    });
+}
 
     nodes.forEach(n => {
         if (levelMap[n.id] === undefined)
@@ -867,7 +868,7 @@ function renderAll(nodes, links, sortedLevels) {
             .text(n.name.charAt(0).toUpperCase());
 
         // Name
-        const dName = n.preferred_name || n.name;
+        const dName = n.name;
         const tName = dName.length > 11
             ? dName.substring(0, 10) + '…' : dName;
 
@@ -1217,7 +1218,7 @@ const uniqueConn = Array.from(connMap.values());
                     <div style="color:#00d4ff;
                                 font-size:0.75rem;">
                         ${genderLabel(
-                            c.label || c.type,
+                            getConnectionLabel(c, n.id),
                             c.member.gender
                           )}
                     </div>
@@ -1704,6 +1705,30 @@ function genderLabel(label, gender) {
     // Fallback
     return label.replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function getConnectionLabel(conn, viewerId) {
+    // We want to show what THIS person is
+    // to the VIEWER
+    // e.g. if viewer is child of Takem Tabi
+    // show Takem Tabi as "Father" not "Son"
+
+    // Find the reverse link
+    // (from the other member back to viewer)
+    const reverseLink = allLinks.find(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        return src === conn.member.id
+            && tgt === viewerId;
+    });
+
+    if (reverseLink) {
+        return reverseLink.label
+            || reverseLink.type;
+    }
+
+    // Fallback to forward label
+    return conn.label || conn.type;
 }
 
 loadTree();
