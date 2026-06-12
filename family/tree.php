@@ -266,44 +266,34 @@ $myMember = getUserMember($pdo, $user['id']);
             " id="search-wrapper">
                 <i class="ti ti-search"
                    style="color:#555;font-size:0.85rem;
-                          margin-right:6px;
-                          flex-shrink:0"></i>
+                          margin-right:6px;flex-shrink:0"></i>
                 <input type="text"
                        id="tree-search"
                        placeholder="Search community members..."
-                       style="
-                           background:transparent;
-                           border:none;outline:none;
-                           color:#e0e0e0;
-                           font-size:0.82rem;
-                           padding:0.45rem 0;
-                           width:220px;
-                       "
+                       style="background:transparent;border:none;
+                              outline:none;color:#e0e0e0;
+                              font-size:0.82rem;padding:0.45rem 0;
+                              width:220px;"
                        oninput="onSearchInput(this.value)"
                        onkeydown="onSearchKey(event)">
                 <button onclick="clearSearch()"
                         id="search-clear"
-                        style="
-                            background:none;border:none;
-                            color:#555;cursor:pointer;
-                            font-size:0.9rem;padding:0;
-                            margin-left:4px;display:none;
-                        ">×</button>
+                        style="background:none;border:none;
+                               color:#555;cursor:pointer;
+                               font-size:0.9rem;padding:0;
+                               margin-left:4px;display:none;">
+                    ×
+                </button>
             </div>
             <div id="search-results"
-                 style="
-                     display:none;
-                     position:absolute;
-                     top:calc(100% + 6px);left:0;
-                     width:340px;
-                     background:#111127;
-                     border:1px solid #1e1e3a;
-                     border-radius:10px;
-                     box-shadow:0 8px 32px rgba(0,0,0,0.6);
-                     z-index:500;
-                     max-height:420px;
-                     overflow-y:auto;
-                 ">
+                 style="display:none;position:absolute;
+                        top:calc(100% + 6px);left:0;
+                        width:340px;background:#111127;
+                        border:1px solid #1e1e3a;
+                        border-radius:10px;
+                        box-shadow:0 8px 32px rgba(0,0,0,0.6);
+                        z-index:500;max-height:420px;
+                        overflow-y:auto;">
             </div>
         </div>
     </div>
@@ -320,11 +310,9 @@ $myMember = getUserMember($pdo, $user['id']);
     </div>
 
     <div id="tree-legend">
-        <div style="color:#aaa;font-size:0.72rem;
-                    font-weight:600;text-transform:uppercase;
-                    letter-spacing:0.06em;margin-bottom:0.6rem">
-            Legend
-        </div>
+        <div style="color:#aaa;font-size:0.72rem;font-weight:600;
+                    text-transform:uppercase;letter-spacing:0.06em;
+                    margin-bottom:0.6rem">Legend</div>
         <div class="legend-row">
             <div style="width:14px;height:14px;border-radius:3px;
                         background:#0d1a3e;border:2px solid #00d4ff">
@@ -345,11 +333,11 @@ $myMember = getUserMember($pdo, $user['id']);
                         background:#111;border:2px dashed #555">
             </div>Deceased
         </div>
-        <div style="border-top:1px solid #1e1e3a;margin:0.5rem 0"></div>
+        <div style="border-top:1px solid #1e1e3a;margin:0.5rem 0">
+        </div>
         <div class="legend-row">
-            <div style="width:22px;height:2px;
-                        background:#4a90d9"></div>
-            Parent / Child
+            <div style="width:22px;height:2px;background:#4a90d9">
+            </div>Parent / Child
         </div>
         <div class="legend-row">
             <div style="width:22px;height:2px;
@@ -374,9 +362,7 @@ $myMember = getUserMember($pdo, $user['id']);
         <div id="panel-content"></div>
     </div>
 
-    <div id="pan-hint">
-        🖱 Drag to pan · Scroll to zoom
-    </div>
+    <div id="pan-hint">🖱 Drag to pan · Scroll to zoom</div>
 
     <div id="empty-state">
         <i class="ti ti-git-fork"
@@ -475,8 +461,7 @@ function initSVG() {
             g.attr('transform', ev.transform);
         });
 
-    svg.call(zoom)
-        .on('dblclick.zoom', null);
+    svg.call(zoom).on('dblclick.zoom', null);
 
     svg.on('click', () => {
         closePanel();
@@ -496,11 +481,6 @@ function buildAndRender() {
             && visibleNodeIds.has(tgt);
     });
 
-    // ── BFS level assignment ──────────────────
-    // RULE: src → tgt | type
-    // type describes what TGT is to SRC
-    // parent = tgt is ABOVE src (ancestor)
-    // child  = tgt is BELOW src (descendant)
     levelMap = {};
     levelMap[ROOT_ID] = 0;
     const visited = new Set([ROOT_ID]);
@@ -516,81 +496,60 @@ function buildAndRender() {
             const type = l.type;
             const lbl  = l.label || '';
 
-            // current is the SOURCE
-            if (src === current) {
-                if (!visited.has(tgt)) {
-                    let level;
-                    if (type === 'parent') {
-                        // tgt is current's parent
-                        // → tgt goes ABOVE
-                        let offset = -1;
-                        if (lbl.includes('grandfather')
-                         || lbl.includes('grandmother'))
-                            offset = -2;
-                        else if (lbl.includes('great_'))
-                            offset = -3;
-                        level = currentLevel + offset;
-                    } else if (type === 'child') {
-                        // tgt is current's child
-                        // → tgt goes BELOW
-                        level = currentLevel + 1;
-                    } else {
-                        // spouse / sibling
-                        // → same level
-                        level = currentLevel;
-                    }
-                    levelMap[tgt] = level;
-                    visited.add(tgt);
-                    queue.push(tgt);
+            if (src === current && !visited.has(tgt)) {
+                let level;
+                if (type === 'parent') {
+                    let offset = -1;
+                    if (lbl.includes('grandfather')
+                     || lbl.includes('grandmother'))
+                        offset = -2;
+                    else if (lbl.includes('great_'))
+                        offset = -3;
+                    level = currentLevel + offset;
+                } else if (type === 'child') {
+                    level = currentLevel + 1;
+                } else {
+                    level = currentLevel;
                 }
+                levelMap[tgt] = level;
+                visited.add(tgt);
+                queue.push(tgt);
             }
 
-            // current is the TARGET
-            if (tgt === current) {
-                if (!visited.has(src)) {
-                    let level;
-                    if (type === 'parent') {
-                        // src → current | parent
-                        // means current IS src's parent
-                        // so src is BELOW current
-                        level = currentLevel + 1;
-                    } else if (type === 'child') {
-                        // src → current | child
-                        // means current IS src's child
-                        // so src is ABOVE current
-                        let offset = -1;
-                        const lnk = allLinks.find(x =>
-                            (x.source.id ?? x.source)
-                                === ROOT_ID
-                            && (x.target.id ?? x.target)
-                                === src
-                        );
-                        const sl = lnk?.label || '';
-                        if (sl.includes('grandfather')
-                         || sl.includes('grandmother'))
-                            offset = -2;
-                        else if (sl.includes('great_'))
-                            offset = -3;
-                        level = currentLevel + offset;
-                    } else {
-                        // spouse / sibling
-                        level = currentLevel;
-                    }
-                    levelMap[src] = level;
-                    visited.add(src);
-                    queue.push(src);
+            if (tgt === current && !visited.has(src)) {
+                let level;
+                if (type === 'parent') {
+                    level = currentLevel + 1;
+                } else if (type === 'child') {
+                    let offset = -1;
+                    const lnk = allLinks.find(x =>
+                        (x.source.id ?? x.source)
+                            === ROOT_ID
+                        && (x.target.id ?? x.target)
+                            === src
+                    );
+                    const sl = lnk?.label || '';
+                    if (sl.includes('grandfather')
+                     || sl.includes('grandmother'))
+                        offset = -2;
+                    else if (sl.includes('great_'))
+                        offset = -3;
+                    level = currentLevel + offset;
+                } else {
+                    level = currentLevel;
                 }
+                levelMap[src] = level;
+                visited.add(src);
+                queue.push(src);
             }
         });
     }
 
-    // Fallback for unvisited nodes
     nodes.forEach(n => {
         if (levelMap[n.id] === undefined)
             levelMap[n.id] = 0;
     });
 
-    // Group nodes by level
     const levels = {};
     nodes.forEach(n => {
         const lv = levelMap[n.id] ?? 0;
@@ -602,7 +561,6 @@ function buildAndRender() {
         .map(Number)
         .sort((a, b) => a - b);
 
-    // Assign x/y positions
     positions = {};
     sortedLevels.forEach(lv => {
         const members = levels[lv];
@@ -624,7 +582,6 @@ function buildAndRender() {
 function renderAll(nodes, links, sortedLevels) {
     g.selectAll('*').remove();
 
-    // Connected IDs for highlighting
     const connectedIds = new Set();
     if (selectedId !== null) {
         connectedIds.add(selectedId);
@@ -652,7 +609,6 @@ function renderAll(nodes, links, sortedLevels) {
          '3': 'Great Grandchildren',
     };
 
-    // Generation row labels
     sortedLevels.forEach(lv => {
         const label = genLabels[lv];
         if (!label) return;
@@ -675,7 +631,6 @@ function renderAll(nodes, links, sortedLevels) {
             .text(label.toUpperCase());
     });
 
-    // ── Draw links ────────────────────────────
     links.forEach(l => {
         const src = l.source.id ?? l.source;
         const tgt = l.target.id ?? l.target;
@@ -694,14 +649,13 @@ function renderAll(nodes, links, sortedLevels) {
         const strokeW = isActive ? 2 : 1;
 
         if (l.type === 'parent') {
-            // Draw from ancestor down to descendant
             let pAnc, pDesc;
             if (lvSrc < lvTgt) {
                 pAnc = p1; pDesc = p2;
             } else if (lvTgt < lvSrc) {
                 pAnc = p2; pDesc = p1;
             } else {
-                return; // same level, skip
+                return;
             }
 
             const x1   = pAnc.x;
@@ -751,7 +705,6 @@ function renderAll(nodes, links, sortedLevels) {
         }
     });
 
-    // ── Draw nodes ────────────────────────────
     nodes.forEach(n => {
         const pos = positions[n.id];
         if (!pos) return;
@@ -787,7 +740,6 @@ function renderAll(nodes, links, sortedLevels) {
                 onNodeClick(n);
             });
 
-        // Glow ring for selected
         if (isSelected) {
             ng.append('rect')
                 .attr('x',  -CW/2 - 5)
@@ -801,7 +753,6 @@ function renderAll(nodes, links, sortedLevels) {
                 .attr('opacity', 0.5);
         }
 
-        // Dashed ring for connected nodes
         if (hasSelection
             && connectedIds.has(n.id)
             && !isSelected) {
@@ -818,7 +769,6 @@ function renderAll(nodes, links, sortedLevels) {
                 .attr('stroke-dasharray', '4,2');
         }
 
-        // Card background
         ng.append('rect')
             .attr('class', 'card-bg')
             .attr('x',  -CW/2).attr('y', -CH/2)
@@ -829,12 +779,10 @@ function renderAll(nodes, links, sortedLevels) {
             .attr('stroke',
                 isSelected ? '#00d4ff' : accentColor)
             .attr('stroke-width',
-                isSelected ? 2.5 :
-                isRoot     ? 2   : 1.5)
+                isSelected ? 2.5 : isRoot ? 2 : 1.5)
             .attr('stroke-dasharray',
                 n.is_deceased ? '5,3' : 'none');
 
-        // Avatar circle
         ng.append('circle')
             .attr('cx', -CW/2 + 24).attr('cy', 0)
             .attr('r',  16)
@@ -846,7 +794,6 @@ function renderAll(nodes, links, sortedLevels) {
             .attr('stroke', accentColor)
             .attr('stroke-width', 1.5);
 
-        // Initial letter
         ng.append('text')
             .attr('x', -CW/2 + 24).attr('y', 5)
             .attr('text-anchor', 'middle')
@@ -856,7 +803,6 @@ function renderAll(nodes, links, sortedLevels) {
             .attr('fill', accentColor)
             .text(n.name.charAt(0).toUpperCase());
 
-        // Full name (never nickname)
         const tName = n.name.length > 11
             ? n.name.substring(0, 10) + '…'
             : n.name;
@@ -870,7 +816,6 @@ function renderAll(nodes, links, sortedLevels) {
             .attr('fill', isRoot ? '#fff' : '#ddd')
             .text(tName);
 
-        // Date range
         if (n.date_range) {
             ng.append('text')
                 .attr('x', -CW/2 + 47).attr('y', 4)
@@ -880,7 +825,6 @@ function renderAll(nodes, links, sortedLevels) {
                 .text(n.date_range);
         }
 
-        // Quarter
         if (n.quarter) {
             ng.append('text')
                 .attr('x', -CW/2 + 47)
@@ -895,7 +839,6 @@ function renderAll(nodes, links, sortedLevels) {
                     : n.quarter);
         }
 
-        // YOU badge
         if (isRoot) {
             ng.append('rect')
                 .attr('x',  CW/2 - 34)
@@ -914,7 +857,6 @@ function renderAll(nodes, links, sortedLevels) {
                 .text('YOU');
         }
 
-        // Verified badge
         if (n.verified && !isRoot) {
             ng.append('circle')
                 .attr('cx', CW/2 - 9)
@@ -932,7 +874,6 @@ function renderAll(nodes, links, sortedLevels) {
                 .text('✓');
         }
 
-        // Deceased cross
         if (n.is_deceased) {
             ng.append('text')
                 .attr('x',  CW/2 - 9)
@@ -943,7 +884,6 @@ function renderAll(nodes, links, sortedLevels) {
                 .text('†');
         }
 
-        // Expand indicator
         const hasHidden = allLinks.some(l => {
             const src = l.source.id ?? l.source;
             const tgt = l.target.id ?? l.target;
@@ -972,7 +912,6 @@ function renderAll(nodes, links, sortedLevels) {
         }
     });
 
-    // Fade in
     g.selectAll('.node-card')
         .style('opacity', 0)
         .transition()
@@ -1034,6 +973,108 @@ function centerOnNode(nodeId) {
         );
 }
 
+// ── Gender-aware label ────────────────────────
+// !! FIX: was using directMap but map
+// was named exactMap — now consistent !!
+function genderLabel(label, gender) {
+    if (!label
+        || label === 'undefined'
+        || label === 'null') return '';
+
+    const exactMap = {
+        'father'               : 'Father',
+        'mother'               : 'Mother',
+        'son'                  : 'Son',
+        'daughter'             : 'Daughter',
+        'spouse'               : 'Spouse',
+        'grandfather_paternal' : 'Grandfather (Paternal)',
+        'grandmother_paternal' : 'Grandmother (Paternal)',
+        'grandfather_maternal' : 'Grandfather (Maternal)',
+        'grandmother_maternal' : 'Grandmother (Maternal)',
+        'great_grandfather'    : 'Great Grandfather',
+        'great_grandmother'    : 'Great Grandmother',
+        'uncle'                : 'Uncle',
+        'aunt'                 : 'Aunt',
+        'nephew'               : 'Nephew',
+        'niece'                : 'Niece',
+        'cousin'               : 'Cousin',
+        'stepfather'           : 'Stepfather',
+        'stepmother'           : 'Stepmother',
+        'half_brother'         : 'Half Brother',
+        'half_sister'          : 'Half Sister',
+        'parent'               : 'Parent',
+        'child'                : 'Child',
+        'grandchild'           : 'Grandchild',
+    };
+
+    // Exact match — no gender needed
+    if (exactMap[label]) return exactMap[label];
+
+    // Gender-dependent labels
+    const maleMap = {
+        'brother'           : 'Brother',
+        'sister'            : 'Brother',
+        'sibling'           : 'Brother',
+        'son_or_daughter'   : 'Son',
+        'father_or_mother'  : 'Father',
+        'uncle_or_aunt'     : 'Uncle',
+        'nephew_or_niece'   : 'Nephew',
+        'grandparent'       : 'Grandfather',
+        'great_grandparent' : 'Great Grandfather',
+        'stepparent'        : 'Stepfather',
+        'stepchild'         : 'Stepson',
+        'grandchild'        : 'Grandson',
+        'relative'          : 'Relative',
+    };
+
+    const femaleMap = {
+        'brother'           : 'Sister',
+        'sister'            : 'Sister',
+        'sibling'           : 'Sister',
+        'son_or_daughter'   : 'Daughter',
+        'father_or_mother'  : 'Mother',
+        'uncle_or_aunt'     : 'Aunt',
+        'nephew_or_niece'   : 'Niece',
+        'grandparent'       : 'Grandmother',
+        'great_grandparent' : 'Great Grandmother',
+        'stepparent'        : 'Stepmother',
+        'stepchild'         : 'Stepdaughter',
+        'grandchild'        : 'Granddaughter',
+        'relative'          : 'Relative',
+    };
+
+    if (gender === 'male' && maleMap[label])
+        return maleMap[label];
+    if (gender === 'female' && femaleMap[label])
+        return femaleMap[label];
+
+    return label.replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Get label from viewer's perspective ───────
+function getConnectionLabel(conn, viewerId) {
+    if (!conn || !conn.member) return '';
+
+    try {
+        const reverseLink = allLinks.find(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            return src === conn.member.id
+                && tgt === viewerId;
+        });
+
+        if (reverseLink) {
+            return reverseLink.label
+                || reverseLink.type
+                || '';
+        }
+        return conn.label || conn.type || '';
+    } catch(e) {
+        return conn.label || conn.type || '';
+    }
+}
+
 // ── Detail panel ──────────────────────────────
 function showDetail(n) {
     const isRoot = n.id === ROOT_ID;
@@ -1042,14 +1083,14 @@ function showDetail(n) {
         n.gender === 'female' ? '#d94a8a' :
         '#4a90d9';
 
-    // Build connections — use reverse link label
-    // so we show what the other person IS to viewer
     const connMap = new Map();
     allLinks.forEach(l => {
         const src = l.source.id ?? l.source;
         const tgt = l.target.id ?? l.target;
         if (src !== n.id) return;
-        const other = allNodes.find(x => x.id === tgt);
+        const other = allNodes.find(
+            x => x.id === tgt
+        );
         if (!other) return;
         if (!connMap.has(tgt) || l.label) {
             connMap.set(tgt, {
@@ -1061,154 +1102,218 @@ function showDetail(n) {
     });
     const uniqueConn = Array.from(connMap.values());
 
-    document.getElementById('panel-content')
-        .innerHTML = `
-        <div style="text-align:center;
-                    margin-bottom:1.25rem">
-            <div style="
-                width:58px;height:58px;
-                border-radius:50%;
-                background:${n.gender === 'female'
-                    ? '#2e0d2e' : '#0d1e3a'};
-                border:2px solid ${gc};
-                ${n.is_deceased
-                    ? 'border-style:dashed;' : ''}
-                display:flex;align-items:center;
-                justify-content:center;
-                font-size:1.3rem;font-weight:700;
-                color:${gc};
-                margin:0 auto 0.75rem;">
-                ${n.name.charAt(0).toUpperCase()}
-            </div>
-            <h4 style="color:#fff;font-size:1rem;
-                       font-weight:600;margin-bottom:3px">
-                ${esc(n.name)}
-            </h4>
-            ${n.preferred_name ? `
-            <div style="color:#888;font-size:0.8rem;
-                        margin-bottom:5px">
-                "${esc(n.preferred_name)}"
-            </div>` : ''}
-            <div style="display:inline-block;
-                        background:rgba(0,212,255,0.1);
-                        border:1px solid rgba(0,212,255,0.2);
-                        color:#00d4ff;font-size:0.72rem;
-                        padding:2px 10px;border-radius:20px;">
-                ${esc(n.quarter || 'Unknown')}
-            </div>
-            ${n.is_deceased ? `
-            <div style="color:#555;font-size:0.78rem;
-                        margin-top:5px">† Deceased</div>` : ''}
-            ${n.verified ? `
-            <div style="color:#00d4ff;font-size:0.75rem;
-                        margin-top:3px">✓ Verified</div>` : ''}
-        </div>
-
-        ${(n.date_range || n.birthplace || n.occupation) ? `
-        <div style="background:#0d0d1a;
-                    border:1px solid #1e1e3a;
-                    border-radius:10px;
-                    padding:0.85rem 1rem;
-                    margin-bottom:1rem;">
-            ${n.date_range ? `
-            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
-                <span style="color:#555;font-size:0.8rem">📅</span>
-                <span style="color:#aaa;font-size:0.82rem">
-                    ${esc(n.date_range)}</span>
-            </div>` : ''}
-            ${n.birthplace ? `
-            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
-                <span style="color:#555;font-size:0.8rem">📍</span>
-                <span style="color:#aaa;font-size:0.82rem">
-                    ${esc(n.birthplace)}</span>
-            </div>` : ''}
-            ${n.occupation ? `
-            <div style="display:flex;gap:8px">
-                <span style="color:#555;font-size:0.8rem">💼</span>
-                <span style="color:#aaa;font-size:0.82rem">
-                    ${esc(n.occupation)}</span>
-            </div>` : ''}
-        </div>` : ''}
-
-        ${n.bio ? `
-        <div style="color:#888;font-size:0.82rem;
-                    line-height:1.6;padding:0.75rem;
-                    border-left:2px solid #1e1e3a;
-                    margin-bottom:1rem;">
-            ${esc(n.bio)}
-        </div>` : ''}
-
-        ${uniqueConn.length ? `
-        <div style="margin-bottom:1rem">
-            <div style="font-size:0.72rem;font-weight:600;
-                        text-transform:uppercase;
-                        letter-spacing:0.06em;
-                        color:#555;margin-bottom:0.6rem;">
-                Connections
-            </div>
-            ${uniqueConn.map(c => `
-            <div onclick="onNodeClick(
-                     allNodes.find(x=>x.id===${c.member.id})
-                 )"
-                 style="display:flex;align-items:center;
-                        gap:0.6rem;padding:0.5rem 0;
-                        border-bottom:1px solid #1a1a2e;
-                        cursor:pointer;">
-                <div style="width:30px;height:30px;
-                            border-radius:50%;
-                            background:#1e1e3a;
-                            display:flex;align-items:center;
-                            justify-content:center;
-                            font-size:0.85rem;font-weight:700;
-                            color:#00d4ff;flex-shrink:0;">
-                    ${c.member.name.charAt(0).toUpperCase()}
+    try {
+        document.getElementById('panel-content')
+            .innerHTML = `
+            <div style="text-align:center;
+                        margin-bottom:1.25rem">
+                <div style="
+                    width:58px;height:58px;
+                    border-radius:50%;
+                    background:${n.gender === 'female'
+                        ? '#2e0d2e' : '#0d1e3a'};
+                    border:2px solid ${gc};
+                    ${n.is_deceased
+                        ? 'border-style:dashed;' : ''}
+                    display:flex;align-items:center;
+                    justify-content:center;
+                    font-size:1.3rem;font-weight:700;
+                    color:${gc};
+                    margin:0 auto 0.75rem;">
+                    ${n.name.charAt(0).toUpperCase()}
                 </div>
-                <div style="flex:1;min-width:0">
-                    <div style="color:#ddd;font-size:0.85rem;
-                                white-space:nowrap;overflow:hidden;
-                                text-overflow:ellipsis;">
-                        ${esc(c.member.name)}
-                    </div>
-                    <div style="color:#00d4ff;font-size:0.75rem;">
-                        ${genderLabel(
-                            getConnectionLabel(c, n.id),
-                            c.member.gender
-                        )}
-                    </div>
+                <h4 style="color:#fff;font-size:1rem;
+                           font-weight:600;
+                           margin-bottom:3px">
+                    ${esc(n.name)}
+                </h4>
+                ${n.preferred_name ? `
+                <div style="color:#888;font-size:0.8rem;
+                            margin-bottom:5px">
+                    "${esc(n.preferred_name)}"
+                </div>` : ''}
+                <div style="display:inline-block;
+                            background:rgba(0,212,255,0.1);
+                            border:1px solid
+                                rgba(0,212,255,0.2);
+                            color:#00d4ff;font-size:0.72rem;
+                            padding:2px 10px;
+                            border-radius:20px;">
+                    ${esc(n.quarter || 'Unknown')}
                 </div>
-                <div style="color:#333;font-size:0.8rem">›</div>
-            </div>`).join('')}
-        </div>` : ''}
+                ${n.is_deceased ? `
+                <div style="color:#555;font-size:0.78rem;
+                            margin-top:5px">
+                    † Deceased
+                </div>` : ''}
+                ${n.verified ? `
+                <div style="color:#00d4ff;
+                            font-size:0.75rem;
+                            margin-top:3px">
+                    ✓ Verified
+                </div>` : ''}
+            </div>
 
-        <div style="display:flex;flex-direction:column;
-                    gap:0.5rem;margin-top:0.5rem;">
-            ${!isRoot ? `
-            <button onclick="alert('Messaging coming soon')"
-                    style="background:#00d4ff;border:none;
-                           color:#000;padding:0.65rem;
-                           border-radius:8px;font-size:0.85rem;
-                           font-weight:600;cursor:pointer;
-                           width:100%;">
-                💬 Send Message
-            </button>` : `
-            <div style="background:rgba(0,212,255,0.06);
-                        border:1px solid rgba(0,212,255,0.15);
-                        border-radius:8px;padding:0.65rem;
-                        text-align:center;color:#00d4ff;
-                        font-size:0.82rem;">
-                This is your profile node
-            </div>`}
-            <a href="${SITE_URL}/family/add.php"
-               style="background:#1e1e3a;
-                      border:1px solid #2a2a4a;
-                      color:#aaa;padding:0.65rem;
-                      border-radius:8px;font-size:0.85rem;
-                      display:block;text-align:center;
-                      text-decoration:none;">
-                + Add Their Relative
-            </a>
-        </div>
-    `;
+            ${(n.date_range || n.birthplace
+               || n.occupation) ? `
+            <div style="background:#0d0d1a;
+                        border:1px solid #1e1e3a;
+                        border-radius:10px;
+                        padding:0.85rem 1rem;
+                        margin-bottom:1rem;">
+                ${n.date_range ? `
+                <div style="display:flex;gap:8px;
+                            margin-bottom:0.5rem">
+                    <span style="color:#555;
+                                 font-size:0.8rem">
+                        📅</span>
+                    <span style="color:#aaa;
+                                 font-size:0.82rem">
+                        ${esc(n.date_range)}</span>
+                </div>` : ''}
+                ${n.birthplace ? `
+                <div style="display:flex;gap:8px;
+                            margin-bottom:0.5rem">
+                    <span style="color:#555;
+                                 font-size:0.8rem">
+                        📍</span>
+                    <span style="color:#aaa;
+                                 font-size:0.82rem">
+                        ${esc(n.birthplace)}</span>
+                </div>` : ''}
+                ${n.occupation ? `
+                <div style="display:flex;gap:8px">
+                    <span style="color:#555;
+                                 font-size:0.8rem">
+                        💼</span>
+                    <span style="color:#aaa;
+                                 font-size:0.82rem">
+                        ${esc(n.occupation)}</span>
+                </div>` : ''}
+            </div>` : ''}
+
+            ${n.bio ? `
+            <div style="color:#888;font-size:0.82rem;
+                        line-height:1.6;padding:0.75rem;
+                        border-left:2px solid #1e1e3a;
+                        margin-bottom:1rem;">
+                ${esc(n.bio)}
+            </div>` : ''}
+
+            ${uniqueConn.length ? `
+            <div style="margin-bottom:1rem">
+                <div style="font-size:0.72rem;
+                            font-weight:600;
+                            text-transform:uppercase;
+                            letter-spacing:0.06em;
+                            color:#555;
+                            margin-bottom:0.6rem;">
+                    Connections
+                </div>
+                ${uniqueConn.map(c => {
+                    const lbl = getConnectionLabel(
+                        c, n.id
+                    );
+                    const displayLbl = genderLabel(
+                        lbl, c.member.gender
+                    );
+                    return `
+                    <div onclick="onNodeClick(
+                             allNodes.find(
+                                 x=>x.id===${c.member.id}
+                             )
+                         )"
+                         style="display:flex;
+                                align-items:center;
+                                gap:0.6rem;
+                                padding:0.5rem 0;
+                                border-bottom:1px solid
+                                    #1a1a2e;
+                                cursor:pointer;">
+                        <div style="width:30px;height:30px;
+                                    border-radius:50%;
+                                    background:#1e1e3a;
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:center;
+                                    font-size:0.85rem;
+                                    font-weight:700;
+                                    color:#00d4ff;
+                                    flex-shrink:0;">
+                            ${c.member.name.charAt(0)
+                                .toUpperCase()}
+                        </div>
+                        <div style="flex:1;min-width:0">
+                            <div style="color:#ddd;
+                                        font-size:0.85rem;
+                                        white-space:nowrap;
+                                        overflow:hidden;
+                                        text-overflow:
+                                            ellipsis;">
+                                ${esc(c.member.name)}
+                            </div>
+                            <div style="color:#00d4ff;
+                                        font-size:0.75rem;">
+                                ${esc(displayLbl)}
+                            </div>
+                        </div>
+                        <div style="color:#333;
+                                    font-size:0.8rem">
+                            ›
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>` : ''}
+
+            <div style="display:flex;
+                        flex-direction:column;
+                        gap:0.5rem;margin-top:0.5rem;">
+                ${!isRoot ? `
+                <button onclick="alert(
+                            'Messaging coming soon')"
+                        style="background:#00d4ff;
+                               border:none;color:#000;
+                               padding:0.65rem;
+                               border-radius:8px;
+                               font-size:0.85rem;
+                               font-weight:600;
+                               cursor:pointer;
+                               width:100%;">
+                    💬 Send Message
+                </button>` : `
+                <div style="background:rgba(0,212,255,0.06);
+                            border:1px solid
+                                rgba(0,212,255,0.15);
+                            border-radius:8px;
+                            padding:0.65rem;
+                            text-align:center;
+                            color:#00d4ff;
+                            font-size:0.82rem;">
+                    This is your profile node
+                </div>`}
+                <a href="${SITE_URL}/family/add.php"
+                   style="background:#1e1e3a;
+                          border:1px solid #2a2a4a;
+                          color:#aaa;padding:0.65rem;
+                          border-radius:8px;
+                          font-size:0.85rem;
+                          display:block;
+                          text-align:center;
+                          text-decoration:none;">
+                    + Add Their Relative
+                </a>
+            </div>
+        `;
+    } catch(e) {
+        console.error('Panel render error:', e);
+        document.getElementById('panel-content')
+            .innerHTML = `
+            <div style="padding:1rem;color:#ff6b6b;
+                        font-size:0.85rem">
+                Error loading details.
+                Check console.
+            </div>`;
+    }
 
     document.getElementById('detail-panel')
         .classList.add('open');
@@ -1250,7 +1355,8 @@ function resetView() {
 function toggleLegend() {
     const l = document.getElementById('tree-legend');
     l.style.display =
-        l.style.display === 'block' ? 'none' : 'block';
+        l.style.display === 'block'
+        ? 'none' : 'block';
 }
 
 function showEmpty() {
@@ -1268,101 +1374,6 @@ function esc(str) {
         .replace(/>/g,  '&gt;')
         .replace(/"/g,  '&quot;')
         .replace(/'/g,  '&#39;');
-}
-
-// ── Gender-aware label ────────────────────────
-function genderLabel(label, gender) {
-    if (!label) return '';
-
-    const exactMap = {
-        'father'               : 'Father',
-        'mother'               : 'Mother',
-        'son'                  : 'Son',
-        'daughter'             : 'Daughter',
-        'brother'              : 'Brother',
-        'sister'               : 'Sister',
-        'spouse'               : 'Spouse',
-        'grandfather_paternal' : 'Grandfather (Paternal)',
-        'grandmother_paternal' : 'Grandmother (Paternal)',
-        'grandfather_maternal' : 'Grandfather (Maternal)',
-        'grandmother_maternal' : 'Grandmother (Maternal)',
-        'great_grandfather'    : 'Great Grandfather',
-        'great_grandmother'    : 'Great Grandmother',
-        'uncle'                : 'Uncle',
-        'aunt'                 : 'Aunt',
-        'nephew'               : 'Nephew',
-        'niece'                : 'Niece',
-        'cousin'               : 'Cousin',
-        'stepfather'           : 'Stepfather',
-        'stepmother'           : 'Stepmother',
-        'half_brother'         : 'Half Brother',
-        'half_sister'          : 'Half Sister',
-        'parent'               : 'Parent',
-        'child'                : 'Child',
-        'sibling'              : 'Sibling',
-        'grandchild'           : 'Grandchild',
-    };
-
-    if (directMap[label]) return directMap[label];
-
-    const maleMap = {
-        'brother'           : 'Brother',
-        'sister'            : 'Brother',
-        'son_or_daughter'   : 'Son',
-        'father_or_mother'  : 'Father',
-        'uncle_or_aunt'     : 'Uncle',
-        'nephew_or_niece'   : 'Nephew',
-        'grandparent'       : 'Grandfather',
-        'great_grandparent' : 'Great Grandfather',
-        'stepparent'        : 'Stepfather',
-        'stepchild'         : 'Stepson',
-        'sibling'           : 'Brother',
-        'grandchild'        : 'Grandson',
-        'relative'          : 'Relative',
-    };
-
-    const femaleMap = {
-        'brother'           : 'Sister',
-        'sister'            : 'Sister',
-        'son_or_daughter'   : 'Daughter',
-        'father_or_mother'  : 'Mother',
-        'uncle_or_aunt'     : 'Aunt',
-        'nephew_or_niece'   : 'Niece',
-        'grandparent'       : 'Grandmother',
-        'great_grandparent' : 'Great Grandmother',
-        'stepparent'        : 'Stepmother',
-        'stepchild'         : 'Stepdaughter',
-        'sibling'           : 'Sister',
-        'grandchild'        : 'Granddaughter',
-        'relative'          : 'Relative',
-    };
-
-    if (gender === 'male' && maleMap[label])
-        return maleMap[label];
-    if (gender === 'female' && femaleMap[label])
-        return femaleMap[label];
-
-    return label.replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
-}
-
-// ── Get correct label from viewer's perspective
-function getConnectionLabel(conn, viewerId) {
-    // Find the reverse link:
-    // from the other member BACK to the viewer
-    // This tells us what the other person IS
-    // to the viewer
-    const reverseLink = allLinks.find(l => {
-        const src = l.source.id ?? l.source;
-        const tgt = l.target.id ?? l.target;
-        return src === conn.member.id
-            && tgt === viewerId;
-    });
-
-    if (reverseLink) {
-        return reverseLink.label || reverseLink.type;
-    }
-    return conn.label || conn.type;
 }
 
 // ── Search ────────────────────────────────────
@@ -1404,8 +1415,10 @@ async function doSearch(query) {
         renderSearchResults(data, query);
     } catch(e) {
         box.innerHTML = `
-            <div style="padding:1rem;text-align:center;
-                        color:#ff6b6b;font-size:0.82rem;">
+            <div style="padding:1rem;
+                        text-align:center;
+                        color:#ff6b6b;
+                        font-size:0.82rem;">
                 Search failed. Try again.
             </div>`;
     }
@@ -1420,8 +1433,11 @@ function renderSearchResults(data, query) {
             <div style="padding:1.25rem;
                         text-align:center;color:#555;">
                 <div style="font-size:1.5rem;
-                            margin-bottom:0.5rem">🔍</div>
-                <div style="font-size:0.85rem;color:#888;">
+                            margin-bottom:0.5rem">
+                    🔍
+                </div>
+                <div style="font-size:0.85rem;
+                            color:#888;">
                     No results for
                     "<strong style="color:#aaa">
                         ${esc(query)}
@@ -1454,7 +1470,8 @@ function renderSearchResults(data, query) {
                     cursor:pointer;
                     border-bottom:1px solid #0d0d1a;"
              onmouseover="this.style.background='#1a1a2e'"
-             onmouseout="this.style.background='transparent'">
+             onmouseout="this.style.background=
+                 'transparent'">
             <div style="width:38px;height:38px;
                         border-radius:50%;flex-shrink:0;
                         background:${r.gender === 'female'
@@ -1462,7 +1479,8 @@ function renderSearchResults(data, query) {
                         border:1.5px solid ${
                             r.is_deceased ? '#444' : gc};
                         ${r.is_deceased
-                            ? 'border-style:dashed;' : ''}
+                            ? 'border-style:dashed;'
+                            : ''}
                         display:flex;align-items:center;
                         justify-content:center;
                         font-size:0.9rem;font-weight:700;
@@ -1472,38 +1490,54 @@ function renderSearchResults(data, query) {
             </div>
             <div style="flex:1;min-width:0">
                 <div style="color:#fff;font-size:0.88rem;
-                            font-weight:500;white-space:nowrap;
-                            overflow:hidden;text-overflow:ellipsis;">
+                            font-weight:500;
+                            white-space:nowrap;
+                            overflow:hidden;
+                            text-overflow:ellipsis;">
                     ${esc(r.full_name)}
-                    ${r.verified
-                        ? '<span style="background:#00d4ff;color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;">✓</span>'
-                        : ''}
-                    ${r.is_deceased
-                        ? '<span style="color:#555;font-size:10px">†</span>'
-                        : ''}
+                    ${r.verified ? `
+                    <span style="background:#00d4ff;
+                                 color:#000;font-size:8px;
+                                 font-weight:700;
+                                 padding:1px 5px;
+                                 border-radius:3px;">
+                        ✓</span>` : ''}
+                    ${r.is_deceased ? `
+                    <span style="color:#555;
+                                 font-size:10px">
+                        †</span>` : ''}
                 </div>
-                <div style="display:flex;align-items:center;
+                <div style="display:flex;
+                            align-items:center;
                             gap:6px;margin-top:2px;">
                     <span style="background:rgba(0,212,255,0.1);
-                                 border:1px solid rgba(0,212,255,0.2);
-                                 color:#00d4ff;font-size:0.7rem;
-                                 padding:1px 6px;border-radius:10px;">
+                                 border:1px solid
+                                     rgba(0,212,255,0.2);
+                                 color:#00d4ff;
+                                 font-size:0.7rem;
+                                 padding:1px 6px;
+                                 border-radius:10px;">
                         ${esc(r.quarter || 'Unknown')}
                     </span>
-                    ${r.date_range
-                        ? `<span style="color:#555;font-size:0.75rem">
-                               ${esc(r.date_range)}</span>`
-                        : ''}
+                    ${r.date_range ? `
+                    <span style="color:#555;
+                                 font-size:0.75rem">
+                        ${esc(r.date_range)}
+                    </span>` : ''}
                 </div>
-                ${r.occupation
-                    ? `<div style="color:#666;font-size:0.75rem;
-                                   margin-top:1px">
-                           ${esc(r.occupation)}</div>`
-                    : ''}
+                ${r.occupation ? `
+                <div style="color:#666;font-size:0.75rem;
+                            margin-top:1px">
+                    ${esc(r.occupation)}
+                </div>` : ''}
             </div>
-            ${r.has_account
-                ? '<div title="Has HeritageLink account" style="width:8px;height:8px;border-radius:50%;background:#00d4ff;flex-shrink:0;"></div>'
-                : ''}
+            ${r.has_account ? `
+            <div title="Has HeritageLink account"
+                 style="width:8px;height:8px;
+                        border-radius:50%;
+                        background:#00d4ff;
+                        flex-shrink:0;">
+            </div>` : ''}
         </div>`;
     }).join('');
 
@@ -1523,25 +1557,30 @@ function showSearchedMember(m) {
         .innerHTML = `
         <div style="background:rgba(0,212,255,0.06);
                     border:1px solid rgba(0,212,255,0.15);
-                    border-radius:8px;padding:0.5rem 0.75rem;
+                    border-radius:8px;
+                    padding:0.5rem 0.75rem;
                     font-size:0.75rem;color:#888;
                     margin-bottom:1rem;">
             <i class="ti ti-search"
-               style="color:#00d4ff;margin-right:4px"></i>
+               style="color:#00d4ff;
+                      margin-right:4px"></i>
             Community search result
         </div>
-        <div style="text-align:center;margin-bottom:1.25rem">
+        <div style="text-align:center;
+                    margin-bottom:1.25rem">
             <div style="width:58px;height:58px;
                         border-radius:50%;
                         background:${m.gender === 'female'
                             ? '#2e0d2e' : '#0d1e3a'};
                         border:2px solid ${gc};
                         ${m.is_deceased
-                            ? 'border-style:dashed;' : ''}
+                            ? 'border-style:dashed;'
+                            : ''}
                         display:flex;align-items:center;
                         justify-content:center;
                         font-size:1.3rem;font-weight:700;
-                        color:${gc};margin:0 auto 0.75rem;">
+                        color:${gc};
+                        margin:0 auto 0.75rem;">
                 ${m.full_name.charAt(0).toUpperCase()}
             </div>
             <h4 style="color:#fff;font-size:1rem;
@@ -1557,52 +1596,75 @@ function showSearchedMember(m) {
                         background:rgba(0,212,255,0.1);
                         border:1px solid rgba(0,212,255,0.2);
                         color:#00d4ff;font-size:0.72rem;
-                        padding:2px 10px;border-radius:20px;">
+                        padding:2px 10px;
+                        border-radius:20px;">
                 ${esc(m.quarter || 'Unknown')}
             </div>
             ${m.is_deceased ? `
             <div style="color:#555;font-size:0.78rem;
-                        margin-top:5px">† Deceased</div>` : ''}
+                        margin-top:5px">
+                † Deceased
+            </div>` : ''}
             ${m.verified ? `
             <div style="color:#00d4ff;font-size:0.75rem;
-                        margin-top:3px">✓ Verified record</div>` : ''}
+                        margin-top:3px">
+                ✓ Verified record
+            </div>` : ''}
         </div>
-        ${(m.date_range || m.birthplace || m.occupation) ? `
-        <div style="background:#0d0d1a;border:1px solid #1e1e3a;
-                    border-radius:10px;padding:0.85rem 1rem;
+        ${(m.date_range || m.birthplace
+           || m.occupation) ? `
+        <div style="background:#0d0d1a;
+                    border:1px solid #1e1e3a;
+                    border-radius:10px;
+                    padding:0.85rem 1rem;
                     margin-bottom:1rem;">
             ${m.date_range ? `
-            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
-                <span style="color:#555;font-size:0.8rem">📅</span>
-                <span style="color:#aaa;font-size:0.82rem">
+            <div style="display:flex;gap:8px;
+                        margin-bottom:0.5rem">
+                <span style="color:#555;
+                             font-size:0.8rem">📅</span>
+                <span style="color:#aaa;
+                             font-size:0.82rem">
                     ${esc(m.date_range)}</span>
             </div>` : ''}
             ${m.birthplace ? `
-            <div style="display:flex;gap:8px;margin-bottom:0.5rem">
-                <span style="color:#555;font-size:0.8rem">📍</span>
-                <span style="color:#aaa;font-size:0.82rem">
+            <div style="display:flex;gap:8px;
+                        margin-bottom:0.5rem">
+                <span style="color:#555;
+                             font-size:0.8rem">📍</span>
+                <span style="color:#aaa;
+                             font-size:0.82rem">
                     ${esc(m.birthplace)}</span>
             </div>` : ''}
             ${m.occupation ? `
             <div style="display:flex;gap:8px">
-                <span style="color:#555;font-size:0.8rem">💼</span>
-                <span style="color:#aaa;font-size:0.82rem">
+                <span style="color:#555;
+                             font-size:0.8rem">💼</span>
+                <span style="color:#aaa;
+                             font-size:0.82rem">
                     ${esc(m.occupation)}</span>
             </div>` : ''}
         </div>` : ''}
-        <div style="display:flex;flex-direction:column;gap:0.5rem;">
-            <button onclick="alert('Messaging coming soon')"
-                    style="background:#00d4ff;border:none;color:#000;
-                           padding:0.65rem;border-radius:8px;
-                           font-size:0.85rem;font-weight:600;
+        <div style="display:flex;flex-direction:column;
+                    gap:0.5rem;">
+            <button onclick="alert(
+                        'Messaging coming soon')"
+                    style="background:#00d4ff;
+                           border:none;color:#000;
+                           padding:0.65rem;
+                           border-radius:8px;
+                           font-size:0.85rem;
+                           font-weight:600;
                            cursor:pointer;width:100%;">
                 💬 Send Message
             </button>
             <a href="${SITE_URL}/family/add.php"
-               style="background:#1e1e3a;border:1px solid #2a2a4a;
-                      color:#aaa;padding:0.65rem;border-radius:8px;
-                      font-size:0.85rem;display:block;
-                      text-align:center;text-decoration:none;">
+               style="background:#1e1e3a;
+                      border:1px solid #2a2a4a;
+                      color:#aaa;padding:0.65rem;
+                      border-radius:8px;font-size:0.85rem;
+                      display:block;text-align:center;
+                      text-decoration:none;">
                 + Add as Family Member
             </a>
         </div>
