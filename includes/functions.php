@@ -83,8 +83,6 @@ function getUserMember($pdo, $user_id) {
 }
 
 // ── Connections ───────────────────────────────
-// type field meaning:
-// source → target | type
 // type describes what TARGET is to SOURCE
 // parent = target is source's parent (above)
 // child  = target is source's child  (below)
@@ -153,6 +151,8 @@ function getRelationLabel(
         'stepparent'        => 'Stepfather',
         'stepchild'         => 'Stepson',
         'sibling'           => 'Brother',
+        'brother'           => 'Brother',
+        'sister'            => 'Brother',
         'grandchild'        => 'Grandson',
         'cousin'            => 'Cousin',
         'relative'          => 'Relative',
@@ -168,19 +168,18 @@ function getRelationLabel(
         'stepparent'        => 'Stepmother',
         'stepchild'         => 'Stepdaughter',
         'sibling'           => 'Sister',
+        'brother'           => 'Sister',
+        'sister'            => 'Sister',
         'grandchild'        => 'Granddaughter',
         'cousin'            => 'Cousin',
         'relative'          => 'Relative',
     ];
 
     $labels = [
-        // Specific labels
         'father'               => 'Father',
         'mother'               => 'Mother',
         'son'                  => 'Son',
         'daughter'             => 'Daughter',
-        'brother'              => 'Brother',
-        'sister'               => 'Sister',
         'spouse'               => 'Spouse',
         'grandfather_paternal' =>
             'Grandfather (Father\'s side)',
@@ -202,7 +201,6 @@ function getRelationLabel(
         'half_brother'         => 'Half Brother',
         'half_sister'          => 'Half Sister',
         'other'                => 'Relative',
-        // Ambiguous reverse labels
         'son_or_daughter'      => 'Son / Daughter',
         'father_or_mother'     => 'Parent',
         'grandchild'           => 'Grandchild',
@@ -221,17 +219,19 @@ function getRelationLabel(
         ? $labels[$label]
         : ucfirst(str_replace('_', ' ', $label));
 
-    // Apply gender override for ambiguous labels
-    $ambiguous = [
+    // Always apply gender override for
+    // gender-dependent labels
+    $gender_dependent = [
         'son_or_daughter', 'father_or_mother',
         'uncle_or_aunt',   'nephew_or_niece',
         'grandparent',     'great_grandparent',
         'stepparent',      'stepchild',
-        'sibling',         'cousin',
+        'sibling',         'brother',
+        'sister',          'cousin',
         'relative',        'grandchild',
     ];
 
-    if (in_array($label, $ambiguous)
+    if (in_array($label, $gender_dependent)
         && $gender !== null) {
         if ($gender === 'male'
             && isset($male_overrides[$label])) {
@@ -247,9 +247,9 @@ function getRelationLabel(
 
 // ── Save relationship ─────────────────────────
 // RULE: type describes what TARGET is to SOURCE
-// parent = target is source's parent (above)
-// child  = target is source's child  (below)
-// spouse = mutual
+// parent  = target is source's parent (above)
+// child   = target is source's child  (below)
+// spouse  = mutual
 // sibling = mutual
 function saveRelationship(
     $pdo,
@@ -258,7 +258,6 @@ function saveRelationship(
     $type,
     $label = null
 ) {
-    // Reverse type
     $reverse_type = [
         'parent'  => 'child',
         'child'   => 'parent',
@@ -266,7 +265,6 @@ function saveRelationship(
         'sibling' => 'sibling',
     ];
 
-    // Reverse label
     $reverse_labels = [
         'father'               => 'son_or_daughter',
         'mother'               => 'son_or_daughter',
@@ -301,25 +299,21 @@ function saveRelationship(
         'sibling'              => 'sibling',
         'cousin'               => 'cousin',
         'relative'             => 'relative',
-        'father_or_mother'     => 'son_or_daughter',
     ];
 
     $r_type  = $reverse_type[$type]    ?? $type;
     $r_label = $reverse_labels[$label] ?? $r_type;
 
-    // Save forward: source → target
     insertRelIfNotExists(
         $pdo, $source_id, $target_id,
         $type, $label
     );
 
-    // Save reverse: target → source
     insertRelIfNotExists(
         $pdo, $target_id, $source_id,
         $r_type, $r_label
     );
 
-    // Auto-infer chain links
     autoInfer(
         $pdo, $source_id, $target_id,
         $type, $label
@@ -347,7 +341,6 @@ function insertRelIfNotExists(
     ")->execute([$m1, $m2, $type, $label]);
 }
 
-// Keep old name as alias for compatibility
 function insertRelationshipIfNotExists(
     $pdo, $m1, $m2, $type, $label
 ) {
@@ -357,21 +350,18 @@ function insertRelationshipIfNotExists(
 }
 
 // ── Auto-infer chain relationships ────────────
-// source_id = the logged-in user's member node
-// target_id = the new member just added
-// type/label = relationship of target TO source
 function autoInfer(
     $pdo, $source_id, $target_id,
     $type, $label
 ) {
-    // Grandparent added → connect to father
+    // ── Grandparent added ─────────────────────
+    // Connect grandparent to existing parent
     if ($label === 'grandfather_paternal'
         || $label === 'grandmother_paternal') {
         $father = findByLabel(
             $pdo, $source_id, 'father'
         );
         if ($father) {
-            // grandparent is parent of father
             insertRelIfNotExists(
                 $pdo, $target_id, $father,
                 'parent', 'father_or_mother'
@@ -400,8 +390,7 @@ function autoInfer(
         }
     }
 
-    // Father added → connect to paternal
-    // grandparents and siblings
+    // ── Father added ──────────────────────────
     if ($label === 'father') {
         // Connect to paternal grandfather
         $gf = findByLabel(
@@ -435,7 +424,7 @@ function autoInfer(
             );
         }
 
-        // Connect siblings to new father
+        // Connect source's siblings to father
         $siblings = findByType(
             $pdo, $source_id, 'sibling'
         );
@@ -451,8 +440,7 @@ function autoInfer(
         }
     }
 
-    // Mother added → connect to maternal
-    // grandparents and siblings
+    // ── Mother added ──────────────────────────
     if ($label === 'mother') {
         $gf = findByLabel(
             $pdo, $source_id,
@@ -484,6 +472,7 @@ function autoInfer(
             );
         }
 
+        // Connect source's siblings to mother
         $siblings = findByType(
             $pdo, $source_id, 'sibling'
         );
@@ -499,11 +488,12 @@ function autoInfer(
         }
     }
 
-    // Sibling added → connect to parents
+    // ── Sibling added ─────────────────────────
     if (in_array($label, [
         'brother', 'sister',
         'half_brother', 'half_sister'
     ])) {
+        // Connect to source's father
         $father = findByLabel(
             $pdo, $source_id, 'father'
         );
@@ -518,6 +508,7 @@ function autoInfer(
             );
         }
 
+        // Connect to source's mother
         $mother = findByLabel(
             $pdo, $source_id, 'mother'
         );
@@ -531,27 +522,73 @@ function autoInfer(
                 'child', 'son_or_daughter'
             );
         }
-    }
 
-    // Spouse added → connect to children
-    if ($label === 'spouse') {
-        $children = findByType(
-            $pdo, $source_id, 'child'
+        // Connect to paternal grandparents
+        $gf_pat = findByLabel(
+            $pdo, $source_id,
+            'grandfather_paternal'
         );
-        foreach ($children as $child) {
+        if ($gf_pat) {
             insertRelIfNotExists(
-                $pdo, $target_id, $child,
-                'parent', 'father_or_mother'
+                $pdo, $gf_pat, $target_id,
+                'parent', 'grandfather_paternal'
             );
             insertRelIfNotExists(
-                $pdo, $child, $target_id,
-                'child', 'son_or_daughter'
+                $pdo, $target_id, $gf_pat,
+                'child', 'grandchild'
+            );
+        }
+
+        $gm_pat = findByLabel(
+            $pdo, $source_id,
+            'grandmother_paternal'
+        );
+        if ($gm_pat) {
+            insertRelIfNotExists(
+                $pdo, $gm_pat, $target_id,
+                'parent', 'grandmother_paternal'
+            );
+            insertRelIfNotExists(
+                $pdo, $target_id, $gm_pat,
+                'child', 'grandchild'
+            );
+        }
+
+        // Connect to maternal grandparents
+        $gf_mat = findByLabel(
+            $pdo, $source_id,
+            'grandfather_maternal'
+        );
+        if ($gf_mat) {
+            insertRelIfNotExists(
+                $pdo, $gf_mat, $target_id,
+                'parent', 'grandfather_maternal'
+            );
+            insertRelIfNotExists(
+                $pdo, $target_id, $gf_mat,
+                'child', 'grandchild'
+            );
+        }
+
+        $gm_mat = findByLabel(
+            $pdo, $source_id,
+            'grandmother_maternal'
+        );
+        if ($gm_mat) {
+            insertRelIfNotExists(
+                $pdo, $gm_mat, $target_id,
+                'parent', 'grandmother_maternal'
+            );
+            insertRelIfNotExists(
+                $pdo, $target_id, $gm_mat,
+                'child', 'grandchild'
             );
         }
     }
 
-    // Child added → connect to spouse
+    // ── Son/Daughter added ────────────────────
     if (in_array($label, ['son', 'daughter'])) {
+        // Connect to source's spouse
         $spouse = findByLabel(
             $pdo, $source_id, 'spouse'
         );
@@ -562,6 +599,56 @@ function autoInfer(
             );
             insertRelIfNotExists(
                 $pdo, $target_id, $spouse,
+                'child', 'son_or_daughter'
+            );
+        }
+
+        // Connect to source's father
+        // (child's grandfather)
+        $gf = findByLabel(
+            $pdo, $source_id, 'father'
+        );
+        if ($gf) {
+            insertRelIfNotExists(
+                $pdo, $gf, $target_id,
+                'parent', 'grandfather_paternal'
+            );
+            insertRelIfNotExists(
+                $pdo, $target_id, $gf,
+                'child', 'grandchild'
+            );
+        }
+
+        // Connect to source's mother
+        // (child's grandmother)
+        $gm = findByLabel(
+            $pdo, $source_id, 'mother'
+        );
+        if ($gm) {
+            insertRelIfNotExists(
+                $pdo, $gm, $target_id,
+                'parent', 'grandmother_maternal'
+            );
+            insertRelIfNotExists(
+                $pdo, $target_id, $gm,
+                'child', 'grandchild'
+            );
+        }
+    }
+
+    // ── Spouse added ──────────────────────────
+    if ($label === 'spouse') {
+        // Connect spouse to source's children
+        $children = findByType(
+            $pdo, $source_id, 'child'
+        );
+        foreach ($children as $child) {
+            insertRelIfNotExists(
+                $pdo, $target_id, $child,
+                'parent', 'father_or_mother'
+            );
+            insertRelIfNotExists(
+                $pdo, $child, $target_id,
                 'child', 'son_or_daughter'
             );
         }
@@ -582,7 +669,6 @@ function findByLabel($pdo, $member_id, $label) {
     return $row ? (int)$row['member_id_2'] : null;
 }
 
-// Keep old name as alias
 function findRelativeByLabel(
     $pdo, $root_id, $label
 ) {
@@ -603,7 +689,6 @@ function findByType($pdo, $member_id, $type) {
     );
 }
 
-// Keep old name as alias
 function findRelativesByType(
     $pdo, $root_id, $type
 ) {
