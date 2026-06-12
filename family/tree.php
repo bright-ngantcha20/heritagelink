@@ -1303,9 +1303,11 @@ function genderLabel(label, gender) {
         'grandchild'           : 'Grandchild',
     };
 
-    if (exactMap[label]) return exactMap[label];
+    if (directMap[label]) return directMap[label];
 
     const maleMap = {
+        'brother'           : 'Brother',
+        'sister'            : 'Brother',
         'son_or_daughter'   : 'Son',
         'father_or_mother'  : 'Father',
         'uncle_or_aunt'     : 'Uncle',
@@ -1320,6 +1322,8 @@ function genderLabel(label, gender) {
     };
 
     const femaleMap = {
+        'brother'           : 'Sister',
+        'sister'            : 'Sister',
         'son_or_daughter'   : 'Daughter',
         'father_or_mother'  : 'Mother',
         'uncle_or_aunt'     : 'Aunt',
