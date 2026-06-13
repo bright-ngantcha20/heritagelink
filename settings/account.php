@@ -44,6 +44,7 @@ $active_tab = $_GET['tab'] ?? 'privacy';
 
 // ── Handle POST ─────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfVerify();
     $action = $_POST['action'] ?? '';
 
     // ── Save Privacy settings ──────────────────
@@ -356,6 +357,8 @@ $cur_qe       = substr($settings['quiet_end']   ?? '07:00:00', 0, 5);
   <?php if ($active_tab === 'privacy'): ?>
 
   <form method="POST" action="?tab=privacy">
+    <?= csrfField() ?>
+    <?= csrfField() ?>
     <input type="hidden" name="action" value="save_privacy">
 
     <!-- Profile visibility -->
@@ -443,6 +446,8 @@ $cur_qe       = substr($settings['quiet_end']   ?? '07:00:00', 0, 5);
   <?php elseif ($active_tab === 'notifications'): ?>
 
   <form method="POST" action="?tab=notifications">
+    <?= csrfField() ?>
+    <?= csrfField() ?>
     <input type="hidden" name="action" value="save_notifications">
 
     <!-- Messaging -->
@@ -713,6 +718,8 @@ $cur_qe       = substr($settings['quiet_end']   ?? '07:00:00', 0, 5);
       Change Email Address
     </div>
     <form method="POST" action="?tab=account">
+    <?= csrfField() ?>
+    <?= csrfField() ?>
       <input type="hidden" name="action"
              value="change_email">
       <div class="mb-3">
@@ -744,6 +751,7 @@ $cur_qe       = substr($settings['quiet_end']   ?? '07:00:00', 0, 5);
       Change Password
     </div>
     <form method="POST" action="?tab=account">
+    <?= csrfField() ?>
       <input type="hidden" name="action"
              value="change_password">
       <div class="mb-3">
@@ -853,6 +861,7 @@ $cur_qe       = substr($settings['quiet_end']   ?? '07:00:00', 0, 5);
         password to confirm.
       </p>
       <form method="POST" action="?tab=account">
+    <?= csrfField() ?>
         <input type="hidden" name="action"
                value="deactivate">
         <div class="mb-3">

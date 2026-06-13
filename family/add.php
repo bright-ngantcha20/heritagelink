@@ -78,6 +78,7 @@ $type_map = [
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfVerify();
 
     $full_name       = trim($_POST['full_name']       ?? '');
     $preferred_name  = trim($_POST['preferred_name']  ?? '');
@@ -396,6 +397,7 @@ $quarters = getAllQuarters($pdo);
 
   <form method="POST" action=""
         enctype="multipart/form-data">
+    <?= csrfField() ?>
 
     <!-- ── RELATIONSHIP TO ME ─────────────── -->
     <div style="

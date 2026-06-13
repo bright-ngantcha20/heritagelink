@@ -70,7 +70,7 @@ $unread = isLoggedIn()
          class="nav-icon me-3" id="msg-icon">
         <i class="ti ti-message"></i>
         <?php if ($unread > 0): ?>
-          <span class="badge"><?= $unread ?></span>
+          <span class="badge" id="msg_badge"><?= $unread ?></span>
         <?php endif; ?>
       </a>
 

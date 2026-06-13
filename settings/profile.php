@@ -37,6 +37,7 @@ $family_type_map = [
 
 // ── Handle form submission ─────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfVerify();
 
     $action = $_POST['action'] ?? 'save_profile';
 
@@ -447,6 +448,7 @@ $connections = ($hasProfile && $myMember)
 
     <form method="POST" action=""
           enctype="multipart/form-data">
+    <?= csrfField() ?>
       <input type="hidden"
              name="action"
              value="save_profile">

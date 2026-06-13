@@ -1,5 +1,70 @@
 <?php
 
+// ── CSRF Protection ────────────────────────────
+/**
+ * Generate a CSRF token for the current session.
+ * Stores it in $_SESSION['csrf_token'].
+ * Call once per session (idempotent).
+ */
+function csrfToken() {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] =
+            bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Render a hidden CSRF input field.
+ * Use inside every <form> that submits via POST.
+ */
+function csrfField() {
+    return '<input type="hidden"
+        name="csrf_token"
+        value="' . csrfToken() . '">';
+}
+
+/**
+ * Verify the CSRF token from a POST request.
+ * Call at the top of every POST handler.
+ * Dies with 403 if token is invalid or missing.
+ */
+function csrfVerify() {
+    $token = $_POST['csrf_token']
+          ?? $_SERVER['HTTP_X_CSRF_TOKEN']
+          ?? '';
+
+    if (!isset($_SESSION['csrf_token'])
+        || empty($token)
+        || !hash_equals(
+            $_SESSION['csrf_token'],
+            $token
+        )
+    ) {
+        http_response_code(403);
+        die(json_encode([
+            'error' => 'Invalid or missing CSRF token.'
+        ]));
+    }
+}
+
+/**
+ * Verify CSRF for API calls that send the token
+ * in the X-CSRF-Token header or POST body.
+ * Returns false instead of dying (for JSON APIs).
+ */
+function csrfVerifyApi() {
+    $token = $_POST['csrf_token']
+          ?? $_SERVER['HTTP_X_CSRF_TOKEN']
+          ?? '';
+    return isset($_SESSION['csrf_token'])
+        && !empty($token)
+        && hash_equals(
+            $_SESSION['csrf_token'],
+            $token
+        );
+}
+
 // ── Output ────────────────────────────────────
 function clean($str) {
     return htmlspecialchars(
@@ -584,6 +649,24 @@ function autoInfer(
                 'child', 'grandchild'
             );
         }
+
+        // Connect new sibling to all
+        // existing siblings of source
+        $existing_siblings = findByType(
+            $pdo, $source_id, 'sibling'
+     );
+     foreach ($existing_siblings as $sib) {
+         // Skip if it is the new member itself
+         if ($sib === $target_id) continue;
+         insertRelIfNotExists(
+             $pdo, $target_id, $sib,
+             'sibling', 'sibling'
+        );
+        insertRelIfNotExists(
+             $pdo, $sib, $target_id,
+             'sibling', 'sibling'
+        );
+     }
     }
 
     // ── Son/Daughter added ────────────────────

@@ -37,6 +37,7 @@ $relation_options = [
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfVerify();
     $member_a = (int)($_POST['member_a'] ?? 0);
     $member_b = (int)($_POST['member_b'] ?? 0);
     $rel_type = $_POST['rel_type'] ?? '';
@@ -176,6 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?php endforeach; ?>
 
   <form method="POST" action="">
+    <?= csrfField() ?>
 
     <div style="
       background:#111127;border:1px solid #1e1e3a;

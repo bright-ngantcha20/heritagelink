@@ -12,6 +12,7 @@ $success = false;
 
 // ── Handle POST ─────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfVerify();
 
     $title       = trim($_POST['title']       ?? '');
     $type        = $_POST['type']             ?? '';
@@ -250,6 +251,7 @@ $era_options = [
 
   <form method="POST" action=""
         enctype="multipart/form-data">
+    <?= csrfField() ?>
 
     <!-- ── Record type ─────────────────────── -->
     <div class="contrib-card mb-4">

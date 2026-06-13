@@ -1278,9 +1278,8 @@ function showDetail(n) {
             <div style="display:flex;
                         flex-direction:column;
                         gap:0.5rem;margin-top:0.5rem;">
-                ${!isRoot ? `
-                <button onclick="alert(
-                            'Messaging coming soon')"
+                ${!isRoot ? (n.is_user ? `
+                <button onclick="startMessage(n)"
                         style="background:#00d4ff;
                                border:none;color:#000;
                                padding:0.65rem;
@@ -1291,6 +1290,15 @@ function showDetail(n) {
                                width:100%;">
                     💬 Send Message
                 </button>` : `
+                <div style="background:rgba(255,255,255,0.03);
+                            border:1px solid #1e1e3a;
+                            border-radius:8px;
+                            padding:0.65rem;
+                            text-align:center;
+                            color:#444;
+                            font-size:0.79rem;">
+                    Not a registered member
+                </div>`) : `
                 <div style="background:rgba(0,212,255,0.06);
                             border:1px solid
                                 rgba(0,212,255,0.15);
@@ -1348,6 +1356,16 @@ function zoomIn() {
 function zoomOut() {
     svg.transition().duration(250)
         .call(zoom.scaleBy, 0.7);
+}
+
+// ── Send Message ──────────────────────────────
+function startMessage(nodeOrMember) {
+    if (!nodeOrMember.is_user) return;
+    const memberId = nodeOrMember.id
+        || nodeOrMember.member_id;
+    window.location.href =
+        `${SITE_URL}/messages/inbox.php`
+        + `?member=${memberId}`;
 }
 
 function resetView() {
@@ -1657,8 +1675,8 @@ function showSearchedMember(m) {
         </div>` : ''}
         <div style="display:flex;flex-direction:column;
                     gap:0.5rem;">
-            <button onclick="alert(
-                        'Messaging coming soon')"
+            ${member.is_user ? `
+            <button onclick="startMessage(member)"
                     style="background:#00d4ff;
                            border:none;color:#000;
                            padding:0.65rem;
@@ -1667,7 +1685,15 @@ function showSearchedMember(m) {
                            font-weight:600;
                            cursor:pointer;width:100%;">
                 💬 Send Message
-            </button>
+            </button>` : `
+            <div style="background:rgba(255,255,255,0.03);
+                        border:1px solid #1e1e3a;
+                        border-radius:8px;
+                        padding:0.65rem;
+                        text-align:center;
+                        color:#444;font-size:0.79rem;">
+                Not a registered member
+            </div>`}
             <a href="${SITE_URL}/family/add.php"
                style="background:#1e1e3a;
                       border:1px solid #2a2a4a;

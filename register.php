@@ -12,6 +12,7 @@ $errors  = [];
 $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfVerify();
     $full_name  = trim($_POST['full_name']  ?? '');
     $email      = trim($_POST['email']      ?? '');
     $password   = $_POST['password']        ?? '';
@@ -101,6 +102,7 @@ $quarters = getAllQuarters($pdo);
     <?php endforeach; ?>
 
     <form method="POST" action="">
+      <?= csrfField() ?>
 
       <div class="mb-3">
         <label>Full Name *</label>
