@@ -498,7 +498,8 @@ function buildAndRender() {
 
             if (src === current && !visited.has(tgt)) {
                 let level;
-                if (type === 'parent') {
+                if (type === 'child') {
+                    // current IS the child → target is ancestor → UP
                     let offset = -1;
                     if (lbl.includes('grandfather')
                      || lbl.includes('grandmother'))
@@ -506,8 +507,14 @@ function buildAndRender() {
                     else if (lbl.includes('great_'))
                         offset = -3;
                     level = currentLevel + offset;
-                } else if (type === 'child') {
-                    level = currentLevel + 1;
+                } else if (type === 'parent') {
+                    // current IS the parent → target is descendant → DOWN
+                    let offset = 1;
+                    if (lbl.includes('grandchild'))
+                        offset = 2;
+                    else if (lbl.includes('great_grandchild'))
+                        offset = 3;
+                    level = currentLevel + offset;
                 } else {
                     level = currentLevel;
                 }
@@ -519,9 +526,11 @@ function buildAndRender() {
             if (tgt === current && !visited.has(src)) {
                 let level;
                 if (type === 'parent') {
-                    level = currentLevel + 1;
+                    // src is parent of current → src goes UP
+                    level = currentLevel - 1;
                 } else if (type === 'child') {
-                    let offset = -1;
+                    // src is child of current → src goes DOWN
+                    let offset = 1;
                     const lnk = allLinks.find(x =>
                         (x.source.id ?? x.source)
                             === ROOT_ID
@@ -529,11 +538,10 @@ function buildAndRender() {
                             === src
                     );
                     const sl = lnk?.label || '';
-                    if (sl.includes('grandfather')
-                     || sl.includes('grandmother'))
-                        offset = -2;
-                    else if (sl.includes('great_'))
-                        offset = -3;
+                    if (sl.includes('grandchild'))
+                        offset = 2;
+                    else if (sl.includes('great_grandchild'))
+                        offset = 3;
                     level = currentLevel + offset;
                 } else {
                     level = currentLevel;
@@ -1145,7 +1153,8 @@ function showDetail(n) {
                 </div>` : ''}
             </div>
 
-            ${(n.date_range || n.birthplace
+            ${(n.date_range || n.current_location
+               || n.birthplace
                || n.occupation) ? `
             <div style="background:#0d0d1a;
                         border:1px solid #1e1e3a;
@@ -1162,7 +1171,7 @@ function showDetail(n) {
                                  font-size:0.82rem">
                         ${esc(n.date_range)}</span>
                 </div>` : ''}
-                ${n.birthplace ? `
+                ${n.current_location ? `
                 <div style="display:flex;gap:8px;
                             margin-bottom:0.5rem">
                     <span style="color:#555;
@@ -1170,7 +1179,17 @@ function showDetail(n) {
                         📍</span>
                     <span style="color:#aaa;
                                  font-size:0.82rem">
-                        ${esc(n.birthplace)}</span>
+                        ${esc(n.current_location)}</span>
+                </div>` : ''}
+                ${n.birthplace && n.birthplace !== n.current_location ? `
+                <div style="display:flex;gap:8px;
+                            margin-bottom:0.5rem">
+                    <span style="color:#555;
+                                 font-size:0.8rem">
+                        🏡</span>
+                    <span style="color:#666;
+                                 font-size:0.78rem">
+                        Born: ${esc(n.birthplace)}</span>
                 </div>` : ''}
                 ${n.occupation ? `
                 <div style="display:flex;gap:8px">
@@ -1602,7 +1621,7 @@ function showSearchedMember(m) {
                 ✓ Verified record
             </div>` : ''}
         </div>
-        ${(m.date_range || m.birthplace
+        ${(m.date_range || m.current_location || m.birthplace
            || m.occupation) ? `
         <div style="background:#0d0d1a;
                     border:1px solid #1e1e3a;
@@ -1618,14 +1637,14 @@ function showSearchedMember(m) {
                              font-size:0.82rem">
                     ${esc(m.date_range)}</span>
             </div>` : ''}
-            ${m.birthplace ? `
+            ${m.current_location ? `
             <div style="display:flex;gap:8px;
                         margin-bottom:0.5rem">
                 <span style="color:#555;
                              font-size:0.8rem">📍</span>
                 <span style="color:#aaa;
                              font-size:0.82rem">
-                    ${esc(m.birthplace)}</span>
+                    ${esc(m.current_location)}</span>
             </div>` : ''}
             ${m.occupation ? `
             <div style="display:flex;gap:8px">

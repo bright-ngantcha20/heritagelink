@@ -584,24 +584,6 @@ function autoInfer(
                 'child', 'grandchild'
             );
         }
-
-        // Connect new sibling to all
-        // existing siblings of source
-        $existing_siblings = findByType(
-            $pdo, $source_id, 'sibling'
-     );
-     foreach ($existing_siblings as $sib) {
-         // Skip if it is the new member itself
-         if ($sib === $target_id) continue;
-         insertRelIfNotExists(
-             $pdo, $target_id, $sib,
-             'sibling', 'sibling'
-        );
-        insertRelIfNotExists(
-             $pdo, $sib, $target_id,
-             'sibling', 'sibling'
-        );
-     }
     }
 
     // ── Son/Daughter added ────────────────────

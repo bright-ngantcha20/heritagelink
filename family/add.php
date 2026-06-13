@@ -86,7 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dob_approx      = isset($_POST['dob_approximate']) ? 1 : 0;
     $date_of_death   = $_POST['date_of_death']        ?? '';
     $dod_approx      = isset($_POST['dod_approximate']) ? 1 : 0;
-    $birthplace      = trim($_POST['birthplace']      ?? '');
+    $birthplace       = trim($_POST['birthplace']       ?? '');
+    $current_location = trim($_POST['current_location'] ?? '');
     $occupation      = trim($_POST['occupation']      ?? '');
     $short_bio       = trim($_POST['short_bio']       ?? '');
     $source          = trim($_POST['source_of_info']  ?? '');
@@ -147,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 dob_approximate,
                 date_of_death,
                 dod_approximate,
-                birthplace, occupation,
+                birthplace, current_location, occupation,
                 short_bio, quarter_id,
                 village_of_origin,
                 photo, source_of_info,
@@ -169,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $date_of_death        ?: null,
             $dod_approx,
             $birthplace           ?: null,
+            $current_location     ?: null,
             $occupation           ?: null,
             $short_bio            ?: null,
             $is_ekpor === 'yes'
@@ -662,6 +664,24 @@ $quarters = getAllQuarters($pdo);
                ) ?>"
                placeholder="Specific village or
                  town where they were born">
+      </div>
+
+      <!-- Current Location -->
+      <div class="mb-3">
+        <label style="color:#aaa;font-size:0.85rem;
+                      display:block;margin-bottom:4px">
+          Current Location
+          <span style="color:#555">(where they live now — optional)</span>
+        </label>
+        <input type="text" name="current_location"
+               class="form-control"
+               style="background:#0d0d1a;
+                      border:1px solid #1e1e3a;
+                      color:#e0e0e0;border-radius:8px"
+               value="<?= clean(
+                   $_POST['current_location'] ?? ''
+               ) ?>"
+               placeholder="e.g. Douala, Yaoundé, London">
       </div>
 
       <!-- Short bio -->

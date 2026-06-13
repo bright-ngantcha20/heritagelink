@@ -68,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Validation
         if (empty($full_name))
             $errors[] = 'Full name is required.';
+        if (empty($gender))
+            $errors[] = 'Gender is required.';
         if (empty($quarter_id))
             $errors[] = 'Please select your quarter.';
 
@@ -96,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         date_of_birth,
                         dob_approximate,
                         birthplace,
+                        current_location,
                         occupation,
                         short_bio,
                         quarter_id,
@@ -131,20 +134,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Link member to user account
                 $pdo->prepare("
                     UPDATE users
-                    SET member_id = ?,
-                        full_name = ?,
-                        quarter_id = ?
+                    SET member_id      = ?,
+                        full_name      = ?,
+                        quarter_id     = ?,
+                        profile_photo  = ?
                     WHERE user_id = ?
                 ")->execute([
                     $new_member_id,
                     $full_name,
                     $quarter_id,
+                    $photo_path,
                     $user['id'],
                 ]);
 
                 // Update session
-                $_SESSION['user_name'] = $full_name;
+                $_SESSION['user_name']  = $full_name;
                 $_SESSION['quarter_id'] = $quarter_id;
+                $_SESSION['photo']      = $photo_path;
 
                 // Log
                 $pdo->prepare("
@@ -178,6 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         date_of_birth   = ?,
                         dob_approximate = ?,
                         birthplace      = ?,
+                        current_location = ?,
                         occupation      = ?,
                         short_bio       = ?,
                         quarter_id      = ?,
@@ -200,17 +207,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Also update users table
                 $pdo->prepare("
                     UPDATE users SET
-                        full_name  = ?,
-                        quarter_id = ?
+                        full_name     = ?,
+                        quarter_id    = ?,
+                        profile_photo = ?
                     WHERE user_id = ?
                 ")->execute([
                     $full_name,
                     $quarter_id,
+                    $photo_path,
                     $user['id'],
                 ]);
 
-                $_SESSION['user_name'] = $full_name;
+                $_SESSION['user_name']  = $full_name;
                 $_SESSION['quarter_id'] = $quarter_id;
+                $_SESSION['photo']      = $photo_path;
 
                 $success  = true;
                 $myMember = getUserMember(
@@ -549,8 +559,9 @@ $connections = ($hasProfile && $myMember)
                   style="background:#0d0d1a;
                          border:1px solid #1e1e3a;
                          color:#e0e0e0;
-                         border-radius:8px">
-            <option value="">-- Select --</option>
+                         border-radius:8px"
+                  required>
+            <option value="">-- Select gender *</option>
             <?php
             $cur_gender =
                 $_POST['gender']
@@ -559,7 +570,7 @@ $connections = ($hasProfile && $myMember)
             foreach ([
                 'male'   => 'Male',
                 'female' => 'Female',
-                'other'  => 'Other',
+                'other'  => 'Other / Prefer not to say',
             ] as $val => $label): ?>
               <option value="<?= $val ?>"
                 <?= $cur_gender === $val
@@ -581,7 +592,8 @@ $connections = ($hasProfile && $myMember)
                          border:1px solid #1e1e3a;
                          color:#e0e0e0;
                          border-radius:8px"
-                  required>
+                  required
+                  onchange="showQuarterInfo(this)">
             <option value="">
               -- Select your quarter --
             </option>
@@ -591,15 +603,52 @@ $connections = ($hasProfile && $myMember)
                 ?? $myMember['quarter_id']
                 ?? $user['quarter_id']
                 ?? '';
-            foreach ($quarters as $q): ?>
+            foreach ($quarters as $q):
+              $is_unknown = stripos(
+                  $q['name'], 'Unknown') !== false;
+            ?>
               <option value="<?= $q['quarter_id'] ?>"
                 <?= $cur_q == $q['quarter_id']
-                    ? 'selected':'' ?>>
+                    ? 'selected':'' ?>
+                data-unknown="<?= $is_unknown
+                    ? '1' : '0' ?>">
                 <?= clean($q['name']) ?>
-                — founded by
-                <?= clean($q['founded_by']) ?>
+                <?= !$is_unknown
+                    ? '— founded by '
+                      . clean($q['founded_by'])
+                    : '' ?>
               </option>
             <?php endforeach; ?>
+          </select>
+
+          <!-- Quarter info panel -->
+          <div id="quarter_info"
+               style="display:none;
+                      margin-top:0.6rem;
+                      padding:0.75rem 1rem;
+                      border-radius:8px;
+                      font-size:0.82rem;
+                      line-height:1.5">
+          </div>
+
+          <!-- Quarter guide -->
+          <div style="
+            margin-top:0.6rem;
+            font-size:0.78rem;color:#555;
+          ">
+            Not sure of your quarter?
+            <a href="<?= SITE_URL ?>/heritage/history.php"
+               target="_blank"
+               style="color:#00d4ff">
+              Learn about the 5 quarters
+            </a>
+            or select
+            <strong style="color:#888">
+              Unknown Quarter
+            </strong>
+            — we can help identify yours
+            through your family connections.
+          </div>
           </select>
         </div>
       </div>
@@ -660,6 +709,31 @@ $connections = ($hasProfile && $myMember)
                ) ?>"
                placeholder="e.g. Ekpor Village,
                              Manyu Division">
+      </div>
+
+      <!-- Current Location -->
+      <div class="mb-3">
+        <label style="color:#aaa;font-size:0.85rem;
+                      display:block;
+                      margin-bottom:4px">
+          Current Location
+          <span style="color:#555;font-size:0.8rem">
+            (where you live now)
+          </span>
+        </label>
+        <input type="text" name="current_location"
+               class="form-control"
+               style="background:#0d0d1a;
+                      border:1px solid #1e1e3a;
+                      color:#e0e0e0;
+                      border-radius:8px"
+               value="<?= clean(
+                   $_POST['current_location']
+                   ?? $myMember['current_location']
+                   ?? ''
+               ) ?>"
+               placeholder="e.g. Yaoundé, Cameroon
+                             or Douala, or London">
       </div>
 
       <!-- Occupation -->
@@ -965,6 +1039,60 @@ function previewPhoto(input) {
         };
         reader.readAsDataURL(input.files[0]);
     }
+}
+
+// ── Quarter info panel ────────────────────────
+const quarterDescriptions = {
+<?php foreach ($quarters as $q):
+  $is_unknown = stripos($q['name'], 'Unknown') !== false;
+?>
+  "<?= $q['quarter_id'] ?>": {
+    name: "<?= clean($q['name']) ?>",
+    founder: "<?= clean($q['founded_by'] ?? '') ?>",
+    desc: "<?= addslashes(trim(
+        preg_replace('/\s+/', ' ', $q['description'] ?? '')
+    )) ?>",
+    unknown: <?= $is_unknown ? 'true' : 'false' ?>,
+  },
+<?php endforeach; ?>
+};
+
+function showQuarterInfo(sel) {
+  const panel = document.getElementById('quarter_info');
+  const val   = sel.value;
+  if (!val || !quarterDescriptions[val]) {
+    panel.style.display = 'none';
+    return;
+  }
+  const q = quarterDescriptions[val];
+  if (q.unknown) {
+    panel.style.display  = 'block';
+    panel.style.background = 'rgba(255,159,26,0.07)';
+    panel.style.border   = '1px solid rgba(255,159,26,0.2)';
+    panel.style.color    = '#aaa';
+    panel.innerHTML = `
+      <i class="ti ti-help-circle"
+         style="color:#ff9f1a;margin-right:6px"></i>
+      <strong style="color:#ff9f1a">
+        No problem — we will help you find your quarter.
+      </strong><br>
+      Once you join the family tree, your connections
+      to other members will help determine which quarter
+      your family belongs to. An elder or administrator
+      can confirm and update your quarter at any time.
+    `;
+  } else {
+    panel.style.display  = 'block';
+    panel.style.background = 'rgba(0,212,255,0.04)';
+    panel.style.border   = '1px solid rgba(0,212,255,0.12)';
+    panel.style.color    = '#888';
+    panel.innerHTML = `
+      <strong style="color:#00d4ff">${q.name}</strong>
+      ${q.founder ? `<span style="color:#555">
+        — founded by ${q.founder}</span>` : ''}
+      <br>${q.desc}
+    `;
+  }
 }
 </script>
 
