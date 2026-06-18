@@ -68,41 +68,61 @@ $members_stmt = $pdo->prepare("
         CASE
             WHEN u.user_id IS NOT NULL
             THEN 1 ELSE 0
-        END AS is_user
+        END AS is_user,
+        u.user_id AS account_user_id
     FROM family_members fm
     LEFT JOIN quarters q
         ON fm.quarter_id = q.quarter_id
     LEFT JOIN users u
         ON u.member_id = fm.member_id
-    WHERE fm.member_id = ?
-       OR fm.added_by  = ?
-       OR fm.member_id IN (
-           SELECT member_id_2
-           FROM relationships
-           WHERE member_id_1 = ?
-       )
-       OR fm.member_id IN (
-           SELECT member_id_1
-           FROM relationships
-           WHERE member_id_2 = ?
-             AND member_id_1 IN (
-                 SELECT fm2.member_id
-                 FROM family_members fm2
-                 WHERE fm2.added_by = ?
-             )
-       )
+    WHERE fm.member_id IN (
+        -- Root + all members reachable within 2 hops
+        SELECT DISTINCT m.member_id FROM family_members m
+        WHERE m.member_id = ?
+        UNION
+        SELECT DISTINCT r1.member_id_2
+        FROM relationships r1
+        WHERE r1.member_id_1 = ?
+        UNION
+        SELECT DISTINCT r1.member_id_1
+        FROM relationships r1
+        WHERE r1.member_id_2 = ?
+        UNION
+        SELECT DISTINCT r2.member_id_2
+        FROM relationships r1
+        JOIN relationships r2
+          ON r2.member_id_1 = r1.member_id_2
+        WHERE r1.member_id_1 = ?
+        UNION
+        SELECT DISTINCT r2.member_id_1
+        FROM relationships r1
+        JOIN relationships r2
+          ON r2.member_id_2 = r1.member_id_2
+        WHERE r1.member_id_1 = ?
+    )
     ORDER BY fm.created_at ASC
 ");
 
 $members_stmt->execute([
     $root_id,
-    $user_id,
     $root_id,
     $root_id,
-    $user_id,
+    $root_id,
+    $root_id,
 ]);
 
 $members_raw = $members_stmt->fetchAll();
+
+// ── Deduplicate by member_id ──────────────────
+$seen_ids    = [];
+$members_dedup = [];
+foreach ($members_raw as $m) {
+    if (!in_array($m['id'], $seen_ids)) {
+        $seen_ids[]      = $m['id'];
+        $members_dedup[] = $m;
+    }
+}
+$members_raw = $members_dedup;
 
 // ── Get all relationships between these members
 $member_ids = array_column($members_raw, 'id');
@@ -195,6 +215,7 @@ foreach ($members_raw as $m) {
         'verified'      => (bool)$m['verified'],
         'is_root'       => $m['id'] === $root_id,
         'is_user'       => (bool)$m['is_user'],
+        'account_user_id' => $m['account_user_id'] ? (int)$m['account_user_id'] : null,
         'is_deceased'   => !empty($m['date_of_death']),
     ];
 }

@@ -419,38 +419,207 @@ function autoInfer(
     $pdo, $source_id, $target_id,
     $type, $label
 ) {
-    // ── Grandparent added ─────────────────────
-    // Connect grandparent to existing parent
+    // ── Paternal Grandparent added ────────────
     if ($label === 'grandfather_paternal'
         || $label === 'grandmother_paternal') {
+
+        // 1. Connect to source's father
         $father = findByLabel(
             $pdo, $source_id, 'father'
         );
         if ($father) {
             insertRelIfNotExists(
                 $pdo, $target_id, $father,
-                'parent', 'father_or_mother'
+                'parent', 'son_or_daughter'
             );
             insertRelIfNotExists(
                 $pdo, $father, $target_id,
-                'child', 'son_or_daughter'
+                'child', $label
+            );
+
+            // 2. Connect to all children of father
+            // (source's siblings → also grandchildren)
+            $fathers_children = findByType(
+                $pdo, $father, 'parent'
+            );
+            foreach ($fathers_children as $gc) {
+                if ($gc === $source_id) continue;
+                insertRelIfNotExists(
+                    $pdo, $target_id, $gc,
+                    'parent', 'grandchild'
+                );
+                insertRelIfNotExists(
+                    $pdo, $gc, $target_id,
+                    'child', $label
+                );
+            }
+
+            // 3. Connect to the other paternal
+            // grandparent (grandfather ↔ grandmother)
+            $other_gp_label =
+                $label === 'grandfather_paternal'
+                ? 'grandmother_paternal'
+                : 'grandfather_paternal';
+            $other_gp = findByLabel(
+                $pdo, $source_id, $other_gp_label
+            );
+            if ($other_gp) {
+                insertRelIfNotExists(
+                    $pdo, $target_id, $other_gp,
+                    'spouse', 'spouse'
+                );
+                insertRelIfNotExists(
+                    $pdo, $other_gp, $target_id,
+                    'spouse', 'spouse'
+                );
+            }
+        }
+
+        // 4. Also connect directly to source
+        // as grandchild (already done by saveRelationship
+        // but ensure it exists)
+        insertRelIfNotExists(
+            $pdo, $target_id, $source_id,
+            'parent', 'grandchild'
+        );
+        insertRelIfNotExists(
+            $pdo, $source_id, $target_id,
+            'child', $label
+        );
+
+        // 5. Find any other members who already
+        // have this grandparent and are therefore
+        // cousins/siblings of source
+        $existing_grandchildren = $pdo->prepare("
+            SELECT member_id_1
+            FROM   relationships
+            WHERE  member_id_2  = ?
+              AND  type         = 'child'
+              AND  relation_label IN (
+                  'grandfather_paternal',
+                  'grandmother_paternal'
+              )
+              AND  member_id_1 != ?
+        ");
+        $existing_grandchildren->execute([
+            $target_id, $source_id
+        ]);
+        foreach (
+            $existing_grandchildren->fetchAll(
+                \PDO::FETCH_COLUMN
+            ) as $cousin_id
+        ) {
+            // They share a grandparent →
+            // they are at minimum cousins.
+            // If they share the same parent
+            // they are siblings (already
+            // handled by father/mother blocks).
+            // We just ensure the grandparent
+            // link exists for them.
+            insertRelIfNotExists(
+                $pdo, $target_id, $cousin_id,
+                'parent', 'grandchild'
+            );
+            insertRelIfNotExists(
+                $pdo, $cousin_id, $target_id,
+                'child', $label
             );
         }
     }
 
+    // ── Maternal Grandparent added ────────────
     if ($label === 'grandfather_maternal'
         || $label === 'grandmother_maternal') {
+
+        // 1. Connect to source's mother
         $mother = findByLabel(
             $pdo, $source_id, 'mother'
         );
         if ($mother) {
             insertRelIfNotExists(
                 $pdo, $target_id, $mother,
-                'parent', 'father_or_mother'
+                'parent', 'son_or_daughter'
             );
             insertRelIfNotExists(
                 $pdo, $mother, $target_id,
-                'child', 'son_or_daughter'
+                'child', $label
+            );
+
+            // 2. Connect to all children of mother
+            $mothers_children = findByType(
+                $pdo, $mother, 'parent'
+            );
+            foreach ($mothers_children as $gc) {
+                if ($gc === $source_id) continue;
+                insertRelIfNotExists(
+                    $pdo, $target_id, $gc,
+                    'parent', 'grandchild'
+                );
+                insertRelIfNotExists(
+                    $pdo, $gc, $target_id,
+                    'child', $label
+                );
+            }
+
+            // 3. Connect to the other maternal
+            // grandparent
+            $other_gp_label =
+                $label === 'grandfather_maternal'
+                ? 'grandmother_maternal'
+                : 'grandfather_maternal';
+            $other_gp = findByLabel(
+                $pdo, $source_id, $other_gp_label
+            );
+            if ($other_gp) {
+                insertRelIfNotExists(
+                    $pdo, $target_id, $other_gp,
+                    'spouse', 'spouse'
+                );
+                insertRelIfNotExists(
+                    $pdo, $other_gp, $target_id,
+                    'spouse', 'spouse'
+                );
+            }
+        }
+
+        // 4. Ensure direct grandchild link
+        insertRelIfNotExists(
+            $pdo, $target_id, $source_id,
+            'parent', 'grandchild'
+        );
+        insertRelIfNotExists(
+            $pdo, $source_id, $target_id,
+            'child', $label
+        );
+
+        // 5. Other grandchildren of this
+        // grandparent
+        $existing_grandchildren = $pdo->prepare("
+            SELECT member_id_1
+            FROM   relationships
+            WHERE  member_id_2  = ?
+              AND  type         = 'child'
+              AND  relation_label IN (
+                  'grandfather_maternal',
+                  'grandmother_maternal'
+              )
+              AND  member_id_1 != ?
+        ");
+        $existing_grandchildren->execute([
+            $target_id, $source_id
+        ]);
+        foreach (
+            $existing_grandchildren->fetchAll(
+                \PDO::FETCH_COLUMN
+            ) as $cousin_id
+        ) {
+            insertRelIfNotExists(
+                $pdo, $target_id, $cousin_id,
+                'parent', 'grandchild'
+            );
+            insertRelIfNotExists(
+                $pdo, $cousin_id, $target_id,
+                'child', $label
             );
         }
     }
@@ -489,7 +658,7 @@ function autoInfer(
             );
         }
 
-        // Connect source's siblings to father
+        // Connect source's existing siblings to father
         $siblings = findByType(
             $pdo, $source_id, 'sibling'
         );
@@ -501,6 +670,35 @@ function autoInfer(
             insertRelIfNotExists(
                 $pdo, $sib, $target_id,
                 'child', 'son_or_daughter'
+            );
+        }
+
+        // ── KEY FIX: find existing children
+        // of this father and make them siblings
+        // of the source (the newly added child)
+        $existing_children = $pdo->prepare("
+            SELECT member_id_1
+            FROM   relationships
+            WHERE  member_id_2   = ?
+              AND  type          = 'child'
+              AND  member_id_1  != ?
+        ");
+        $existing_children->execute([
+            $target_id, $source_id
+        ]);
+        foreach (
+            $existing_children->fetchAll(
+                \PDO::FETCH_COLUMN
+            ) as $sibling_id
+        ) {
+            // Make them siblings of each other
+            insertRelIfNotExists(
+                $pdo, $source_id, $sibling_id,
+                'sibling', 'sibling'
+            );
+            insertRelIfNotExists(
+                $pdo, $sibling_id, $source_id,
+                'sibling', 'sibling'
             );
         }
     }
@@ -549,6 +747,33 @@ function autoInfer(
             insertRelIfNotExists(
                 $pdo, $sib, $target_id,
                 'child', 'son_or_daughter'
+            );
+        }
+
+        // ── KEY FIX: find existing children
+        // of this mother and make them siblings
+        $existing_children = $pdo->prepare("
+            SELECT member_id_1
+            FROM   relationships
+            WHERE  member_id_2   = ?
+              AND  type          = 'child'
+              AND  member_id_1  != ?
+        ");
+        $existing_children->execute([
+            $target_id, $source_id
+        ]);
+        foreach (
+            $existing_children->fetchAll(
+                \PDO::FETCH_COLUMN
+            ) as $sibling_id
+        ) {
+            insertRelIfNotExists(
+                $pdo, $source_id, $sibling_id,
+                'sibling', 'sibling'
+            );
+            insertRelIfNotExists(
+                $pdo, $sibling_id, $source_id,
+                'sibling', 'sibling'
             );
         }
     }
@@ -667,6 +892,56 @@ function autoInfer(
              'sibling', 'sibling'
         );
      }
+
+        // ── KEY: find ALL other children of
+        // source's parents and link as siblings
+        // This handles the case where two users
+        // independently add the same parent
+        $source_parents = $pdo->prepare("
+            SELECT member_id_2
+            FROM   relationships
+            WHERE  member_id_1 = ?
+              AND  type        = 'child'
+        ");
+        $source_parents->execute([$source_id]);
+        $parent_ids = array_column(
+            $source_parents->fetchAll(),
+            'member_id_2'
+        );
+
+        foreach ($parent_ids as $parent_id) {
+            // Find all children of this parent
+            $parent_children = $pdo->prepare("
+                SELECT member_id_1
+                FROM   relationships
+                WHERE  member_id_2  = ?
+                  AND  type         = 'child'
+                  AND  member_id_1 != ?
+                  AND  member_id_1 != ?
+            ");
+            $parent_children->execute([
+                $parent_id,
+                $source_id,
+                $target_id,
+            ]);
+            foreach (
+                $parent_children->fetchAll(
+                    \PDO::FETCH_COLUMN
+                ) as $half_sibling_id
+            ) {
+                // Link target ↔ this child
+                insertRelIfNotExists(
+                    $pdo, $target_id,
+                    $half_sibling_id,
+                    'sibling', 'sibling'
+                );
+                insertRelIfNotExists(
+                    $pdo, $half_sibling_id,
+                    $target_id,
+                    'sibling', 'sibling'
+                );
+            }
+        }
     }
 
     // ── Son/Daughter added ────────────────────
@@ -716,6 +991,42 @@ function autoInfer(
                 $pdo, $target_id, $gm,
                 'child', 'grandchild'
             );
+        }
+
+        // ── KEY: find existing children of
+        // source and make them siblings of
+        // the new child
+        $existing_children = findByType(
+            $pdo, $source_id, 'parent'
+        );
+        foreach ($existing_children as $sib_id) {
+            if ($sib_id === $target_id) continue;
+            insertRelIfNotExists(
+                $pdo, $target_id, $sib_id,
+                'sibling', 'sibling'
+            );
+            insertRelIfNotExists(
+                $pdo, $sib_id, $target_id,
+                'sibling', 'sibling'
+            );
+        }
+
+        // Also link via spouse's children
+        if ($spouse) {
+            $spouse_children = findByType(
+                $pdo, $spouse, 'parent'
+            );
+            foreach ($spouse_children as $sib_id) {
+                if ($sib_id === $target_id) continue;
+                insertRelIfNotExists(
+                    $pdo, $target_id, $sib_id,
+                    'sibling', 'sibling'
+                );
+                insertRelIfNotExists(
+                    $pdo, $sib_id, $target_id,
+                    'sibling', 'sibling'
+                );
+            }
         }
     }
 

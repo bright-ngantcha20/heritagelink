@@ -1320,6 +1320,18 @@ function showDetail(n) {
                           text-decoration:none;">
                     + Add Their Relative
                 </a>
+                <a href="${SITE_URL}/family/edit.php?id=${n.id}"
+                   style="background:rgba(255,255,255,0.03);
+                          border:1px solid #1e1e3a;
+                          color:#666;padding:0.5rem;
+                          border-radius:8px;
+                          font-size:0.82rem;
+                          display:block;
+                          text-align:center;
+                          text-decoration:none;
+                          margin-top:0.4rem;">
+                    ✎ Propose an Edit
+                </a>
             </div>
         `;
     } catch(e) {
@@ -1363,9 +1375,19 @@ function startMessage(nodeOrMember) {
     if (!nodeOrMember.is_user) return;
     const memberId = nodeOrMember.id
         || nodeOrMember.member_id;
-    window.location.href =
-        `${SITE_URL}/messages/inbox.php`
-        + `?member=${memberId}`;
+    const userId   = nodeOrMember.account_user_id;
+
+    if (userId) {
+        // Direct route via user_id
+        window.location.href =
+            `${SITE_URL}/messages/inbox.php`
+            + `?to=${userId}`;
+    } else {
+        // Fallback: look up user from member_id
+        window.location.href =
+            `${SITE_URL}/messages/inbox.php`
+            + `?member=${memberId}`;
+    }
 }
 
 function resetView() {

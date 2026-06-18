@@ -52,20 +52,24 @@ $relation_options = [
 ];
 
 $type_map = [
-    'father'               => 'parent',
-    'mother'               => 'parent',
-    'grandfather_paternal' => 'parent',
-    'grandmother_paternal' => 'parent',
-    'grandfather_maternal' => 'parent',
-    'grandmother_maternal' => 'parent',
-    'great_grandfather'    => 'parent',
-    'great_grandmother'    => 'parent',
-    'stepfather'           => 'parent',
-    'stepmother'           => 'parent',
-    'son'                  => 'child',
-    'daughter'             => 'child',
-    'nephew'               => 'child',
-    'niece'                => 'child',
+    // When I add my father/mother/grandparent,
+    // I (source) am the CHILD → type = 'child'
+    'father'               => 'child',
+    'mother'               => 'child',
+    'grandfather_paternal' => 'child',
+    'grandmother_paternal' => 'child',
+    'grandfather_maternal' => 'child',
+    'grandmother_maternal' => 'child',
+    'great_grandfather'    => 'child',
+    'great_grandmother'    => 'child',
+    'stepfather'           => 'child',
+    'stepmother'           => 'child',
+    // When I add my son/daughter/nephew/niece,
+    // I (source) am the PARENT → type = 'parent'
+    'son'                  => 'parent',
+    'daughter'             => 'parent',
+    'nephew'               => 'parent',
+    'niece'                => 'parent',
     'spouse'               => 'spouse',
     'brother'              => 'sibling',
     'sister'               => 'sibling',
@@ -142,7 +146,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
 
-        $stmt = $pdo->prepare("
+        // ── Check if linking to existing member ─
+        $link_existing = (int)(
+            $_POST['link_existing_id'] ?? 0
+        );
+
+        if ($link_existing) {
+            // User confirmed they want to link
+            // to an existing member
+            $existing = $pdo->prepare("
+                SELECT member_id, full_name
+                FROM family_members
+                WHERE member_id = ?
+                LIMIT 1
+            ");
+            $existing->execute([$link_existing]);
+            $existing_member = $existing->fetch();
+
+            if ($existing_member) {
+                $db_type = $type_map[$my_relation]
+                           ?? 'sibling';
+
+                saveRelationship(
+                    $pdo,
+                    $myMember['member_id'],
+                    $link_existing,
+                    $db_type,
+                    $my_relation
+                );
+
+                $pdo->prepare("
+                    INSERT INTO audit_log
+                        (user_id, action,
+                         target_type, target_id,
+                         detail)
+                    VALUES
+                        (?, 'link_existing_member',
+                         'family_member', ?, ?)
+                ")->execute([
+                    $user['id'],
+                    $link_existing,
+                    'Linked existing member as '
+                    . $my_relation . ': '
+                    . $existing_member['full_name'],
+                ]);
+
+                $success      = true;
+                $success_name = $existing_member[
+                    'full_name'
+                ];
+                $success_rel  = $relation_options[
+                    array_key_first(
+                        array_filter(
+                            $relation_options,
+                            fn($g) => isset(
+                                $g[$my_relation]
+                            )
+                        )
+                    )
+                ][$my_relation] ?? $my_relation;
+
+                $_POST = [];
+
+            } else {
+                $errors[] = 'Selected member not found.';
+            }
+
+        } else {
+
+            // ── Check for existing members with
+            // same name before inserting ──────────
+            $dupe_check = $pdo->prepare("
+                SELECT member_id, full_name,
+                       gender, birthplace,
+                       date_of_birth,
+                       quarter_id,
+                       q.name AS quarter_name
+                FROM family_members fm
+                LEFT JOIN quarters q
+                    ON q.quarter_id = fm.quarter_id
+                WHERE LOWER(TRIM(fm.full_name))
+                    = LOWER(TRIM(?))
+                  AND fm.member_id
+                    != ?
+            ");
+            $dupe_check->execute([
+                $full_name,
+                $myMember['member_id'],
+            ]);
+            $possible_dupes = $dupe_check->fetchAll(
+                PDO::FETCH_ASSOC
+            );
+
+            // If matches found — show confirmation
+            // prompt instead of inserting
+            if (!empty($possible_dupes)
+                && !isset($_POST['confirm_new'])
+            ) {
+                $show_dupe_prompt = true;
+                $dupe_matches = $possible_dupes;
+                // Don't insert — fall through to
+                // show the form with prompt
+            } else {
             INSERT INTO family_members (
                 full_name, preferred_name,
                 gender, date_of_birth,
@@ -158,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
-                ?
+                ?, ?
             )
         ");
 
@@ -226,6 +331,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ][$my_relation] ?? $my_relation;
 
         $_POST = []; // Clear form data after successful submission
+
+            } // end else (confirm_new / no dupes)
+        } // end else (not link_existing)
     }
 }
 
@@ -394,6 +502,113 @@ $quarters = getAllQuarters($pdo);
       <?= clean($e) ?>
     </div>
   <?php endforeach; ?>
+
+  <?php if (!empty($show_dupe_prompt)
+            && !empty($dupe_matches)): ?>
+  <!-- ── Duplicate member prompt ─────────── -->
+  <div style="
+    background:rgba(255,159,26,0.08);
+    border:1px solid rgba(255,159,26,0.3);
+    border-radius:12px;padding:1.25rem 1.5rem;
+    margin-bottom:1.5rem;
+  ">
+    <div style="
+      color:#ff9f1a;font-weight:600;
+      font-size:0.9rem;margin-bottom:0.75rem;
+      display:flex;align-items:center;gap:0.5rem;
+    ">
+      <i class="ti ti-alert-triangle"></i>
+      This person may already be in the system
+    </div>
+    <p style="color:#aaa;font-size:0.85rem;
+              margin-bottom:1rem">
+      We found <?= count($dupe_matches) ?>
+      existing member<?= count($dupe_matches) > 1
+          ? 's' : '' ?>
+      with a similar name. Is this the same person?
+    </p>
+
+    <?php foreach ($dupe_matches as $dm): ?>
+    <form method="POST" action=""
+          style="margin-bottom:0.6rem">
+      <?= csrfField() ?>
+      <!-- Carry forward all form data -->
+      <?php foreach ($_POST as $k => $v):
+        if ($k === 'csrf_token') continue;
+        if (is_array($v)) continue; ?>
+        <input type="hidden"
+               name="<?= clean($k) ?>"
+               value="<?= clean($v) ?>">
+      <?php endforeach; ?>
+      <input type="hidden"
+             name="link_existing_id"
+             value="<?= (int)$dm['member_id'] ?>">
+
+      <div style="
+        display:flex;align-items:center;
+        justify-content:space-between;
+        background:#111127;
+        border:1px solid #2a2a4a;
+        border-radius:9px;
+        padding:0.75rem 1rem;
+        gap:1rem;flex-wrap:wrap;
+      ">
+        <div>
+          <div style="color:#e0e0e0;
+                      font-weight:500;
+                      font-size:0.9rem">
+            <?= clean($dm['full_name']) ?>
+          </div>
+          <div style="color:#555;font-size:0.78rem;
+                      margin-top:2px">
+            <?= $dm['gender'] ? ucfirst($dm['gender']) : '' ?>
+            <?= $dm['quarter_name']
+                ? ' · ' . clean($dm['quarter_name'])
+                : '' ?>
+            <?= $dm['birthplace']
+                ? ' · Born: ' . clean($dm['birthplace'])
+                : '' ?>
+          </div>
+        </div>
+        <button type="submit" style="
+          background:#ff9f1a;color:#000;
+          border:none;border-radius:8px;
+          padding:0.45rem 1.1rem;
+          font-size:0.85rem;font-weight:600;
+          cursor:pointer;white-space:nowrap;
+        ">
+          Yes, this is them
+        </button>
+      </div>
+    </form>
+    <?php endforeach; ?>
+
+    <!-- Option to create anyway -->
+    <form method="POST" action=""
+          style="margin-top:0.75rem">
+      <?= csrfField() ?>
+      <?php foreach ($_POST as $k => $v):
+        if ($k === 'csrf_token') continue;
+        if (is_array($v)) continue; ?>
+        <input type="hidden"
+               name="<?= clean($k) ?>"
+               value="<?= clean($v) ?>">
+      <?php endforeach; ?>
+      <input type="hidden"
+             name="confirm_new" value="1">
+      <button type="submit" style="
+        background:transparent;
+        border:1px solid #2a2a4a;
+        color:#666;border-radius:8px;
+        padding:0.45rem 1.1rem;
+        font-size:0.82rem;cursor:pointer;
+      ">
+        No, this is a different person —
+        create a new record
+      </button>
+    </form>
+  </div>
+  <?php endif; ?>
 
   <form method="POST" action=""
         enctype="multipart/form-data">

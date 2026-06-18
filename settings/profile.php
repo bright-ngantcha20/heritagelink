@@ -90,6 +90,148 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($errors)) {
 
             if (!$hasProfile) {
+
+                // ── Check for existing member
+                // with same name before creating ─
+                $link_existing_id = (int)(
+                    $_POST['link_existing_id'] ?? 0
+                );
+                $confirm_new = isset(
+                    $_POST['confirm_new']
+                );
+
+                if (!$link_existing_id
+                    && !$confirm_new) {
+                    // Search for name match
+                    $dupe = $pdo->prepare("
+                        SELECT fm.member_id,
+                               fm.full_name,
+                               fm.gender,
+                               fm.birthplace,
+                               fm.date_of_birth,
+                               q.name AS quarter_name
+                        FROM family_members fm
+                        LEFT JOIN quarters q
+                          ON q.quarter_id
+                              = fm.quarter_id
+                        WHERE LOWER(TRIM(fm.full_name))
+                            = LOWER(TRIM(?))
+                        LIMIT 5
+                    ");
+                    $dupe->execute([$full_name]);
+                    $dupe_matches = $dupe->fetchAll(
+                        PDO::FETCH_ASSOC
+                    );
+
+                    if (!empty($dupe_matches)) {
+                        // Show prompt — skip INSERT
+                        $show_dupe_prompt = true;
+                        $errors = []; // not an error
+                    }
+                }
+
+                if ($link_existing_id) {
+                    // ── Link this user account to
+                    // the existing family_member ──
+                    $existing = $pdo->prepare("
+                        SELECT member_id, full_name,
+                               photo, quarter_id
+                        FROM family_members
+                        WHERE member_id = ?
+                        LIMIT 1
+                    ");
+                    $existing->execute(
+                        [$link_existing_id]
+                    );
+                    $existing_row = $existing->fetch();
+
+                    if ($existing_row) {
+                        // Update the existing row
+                        // with any new info provided
+                        $pdo->prepare("
+                            UPDATE family_members SET
+                                preferred_name
+                                    = COALESCE(?, preferred_name),
+                                gender
+                                    = ?,
+                                date_of_birth
+                                    = COALESCE(?, date_of_birth),
+                                birthplace
+                                    = COALESCE(?, birthplace),
+                                current_location
+                                    = COALESCE(?, current_location),
+                                occupation
+                                    = COALESCE(?, occupation),
+                                short_bio
+                                    = COALESCE(?, short_bio),
+                                photo
+                                    = COALESCE(?, photo),
+                                verified = 1,
+                                source_of_info
+                                    = 'Self — registered user'
+                            WHERE member_id = ?
+                        ")->execute([
+                            $preferred_name ?: null,
+                            $gender,
+                            $date_of_birth  ?: null,
+                            $birthplace     ?: null,
+                            $current_location ?: null,
+                            $occupation     ?: null,
+                            $short_bio      ?: null,
+                            $photo_path,
+                            $link_existing_id,
+                        ]);
+
+                        // Link user → existing member
+                        $pdo->prepare("
+                            UPDATE users SET
+                                member_id     = ?,
+                                full_name     = ?,
+                                quarter_id    = ?,
+                                profile_photo = ?
+                            WHERE user_id = ?
+                        ")->execute([
+                            $link_existing_id,
+                            $full_name,
+                            $quarter_id,
+                            $photo_path
+                                ?: $existing_row['photo'],
+                            $user['id'],
+                        ]);
+
+                        $_SESSION['user_name']  =
+                            $full_name;
+                        $_SESSION['quarter_id'] =
+                            $quarter_id;
+                        $_SESSION['photo']      =
+                            $photo_path
+                            ?: $existing_row['photo'];
+
+                        $pdo->prepare("
+                            INSERT INTO audit_log
+                                (user_id, action,
+                                 target_type,
+                                 target_id, detail)
+                            VALUES
+                                (?, 'link_existing_member',
+                                 'family_member', ?, ?)
+                        ")->execute([
+                            $user['id'],
+                            $link_existing_id,
+                            'User linked account to '
+                            . 'existing member: '
+                            . $full_name,
+                        ]);
+
+                        $success    = true;
+                        $hasProfile = true;
+                        $myMember   = getUserMember(
+                            $pdo, $user['id']
+                        );
+                    }
+
+                } elseif ($confirm_new
+                          || empty($show_dupe_prompt)) {
                 // ── Create new family member ──
                 $stmt = $pdo->prepare("
                     INSERT INTO family_members (
@@ -109,18 +251,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         verified,
                         added_by
                     ) VALUES (
-                        ?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
                     )
                 ");
                 $stmt->execute([
                     $full_name,
-                    $preferred_name ?: null,
-                    $gender         ?: null,
-                    $date_of_birth  ?: null,
+                    $preferred_name   ?: null,
+                    $gender           ?: null,
+                    $date_of_birth    ?: null,
                     $dob_approx,
-                    $birthplace     ?: null,
-                    $occupation     ?: null,
-                    $short_bio      ?: null,
+                    $birthplace       ?: null,
+                    $current_location ?: null,
+                    $occupation       ?: null,
+                    $short_bio        ?: null,
                     $quarter_id,
                     $photo_path,
                     'Self — registered user',
@@ -175,6 +318,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo, $user['id']
                 );
 
+                } // end elseif confirm_new
+
             } else {
                 // ── Update existing member ────
                 $pdo->prepare("
@@ -195,11 +340,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $full_name,
                     $preferred_name ?: null,
                     $gender         ?: null,
-                    $date_of_birth  ?: null,
+                    $date_of_birth    ?: null,
                     $dob_approx,
-                    $birthplace     ?: null,
-                    $occupation     ?: null,
-                    $short_bio      ?: null,
+                    $birthplace       ?: null,
+                    $current_location ?: null,
+                    $occupation       ?: null,
+                    $short_bio        ?: null,
                     $quarter_id,
                     $photo_path,
                     $myMember['member_id'],
@@ -428,6 +574,137 @@ $connections = ($hasProfile && $myMember)
     <?= clean($e) ?>
   </div>
   <?php endforeach; ?>
+
+  <?php if (!empty($show_dupe_prompt)
+            && !empty($dupe_matches)): ?>
+  <!-- ── Existing member prompt ───────────── -->
+  <div style="
+    background:rgba(255,159,26,0.08);
+    border:1px solid rgba(255,159,26,0.3);
+    border-radius:12px;
+    padding:1.25rem 1.5rem;
+    margin-bottom:1.5rem;
+  ">
+    <div style="
+      color:#ff9f1a;font-weight:600;
+      font-size:0.95rem;margin-bottom:0.5rem;
+      display:flex;align-items:center;gap:0.5rem;
+    ">
+      <i class="ti ti-users"></i>
+      You may already be in the family tree!
+    </div>
+    <p style="color:#aaa;font-size:0.85rem;
+              margin-bottom:1rem;line-height:1.5">
+      Someone has already added a family member
+      named <strong style="color:#fff">
+      <?= clean($_POST['full_name'] ?? '') ?>
+      </strong> to the HeritageLink tree.
+      Is that you? If so, click your name below
+      to link your account — your existing family
+      connections will be preserved automatically.
+    </p>
+
+    <?php foreach ($dupe_matches as $dm): ?>
+    <form method="POST" action="">
+      <?= csrfField() ?>
+      <input type="hidden" name="action"
+             value="save_profile">
+      <!-- Carry forward profile form data -->
+      <?php
+      $carry_fields = [
+          'full_name', 'preferred_name',
+          'gender', 'date_of_birth',
+          'dob_approximate', 'birthplace',
+          'current_location', 'occupation',
+          'short_bio', 'quarter_id',
+      ];
+      foreach ($carry_fields as $cf):
+        $v = $_POST[$cf] ?? '';
+        if (empty($v)) continue;
+      ?>
+        <input type="hidden"
+               name="<?= $cf ?>"
+               value="<?= clean($v) ?>">
+      <?php endforeach; ?>
+      <input type="hidden"
+             name="link_existing_id"
+             value="<?= (int)$dm['member_id'] ?>">
+
+      <div style="
+        display:flex;align-items:center;
+        justify-content:space-between;
+        background:#0d0d1a;
+        border:1px solid #2a2a4a;
+        border-radius:9px;
+        padding:0.85rem 1.1rem;
+        margin-bottom:0.6rem;gap:1rem;
+        flex-wrap:wrap;
+      ">
+        <div>
+          <div style="color:#fff;font-weight:600;
+                      font-size:0.95rem">
+            <?= clean($dm['full_name']) ?>
+          </div>
+          <div style="color:#666;font-size:0.8rem;
+                      margin-top:3px">
+            <?= $dm['gender']
+                ? ucfirst($dm['gender']) : '' ?>
+            <?= $dm['quarter_name']
+                ? ' · ' . clean($dm['quarter_name'])
+                : '' ?>
+            <?= $dm['birthplace']
+                ? ' · Born in '
+                  . clean($dm['birthplace'])
+                : '' ?>
+            <?= $dm['date_of_birth']
+                ? ' · '
+                  . date('Y', strtotime(
+                      $dm['date_of_birth']
+                  ))
+                : '' ?>
+          </div>
+        </div>
+        <button type="submit" style="
+          background:#ff9f1a;color:#000;
+          border:none;border-radius:8px;
+          padding:0.5rem 1.25rem;
+          font-weight:700;font-size:0.88rem;
+          cursor:pointer;white-space:nowrap;
+        ">
+          ✓ Yes, that's me
+        </button>
+      </div>
+    </form>
+    <?php endforeach; ?>
+
+    <!-- Option to create new anyway -->
+    <form method="POST" action=""
+          style="margin-top:0.85rem">
+      <?= csrfField() ?>
+      <input type="hidden" name="action"
+             value="save_profile">
+      <?php foreach ($carry_fields as $cf):
+        $v = $_POST[$cf] ?? '';
+        if (empty($v)) continue; ?>
+        <input type="hidden"
+               name="<?= $cf ?>"
+               value="<?= clean($v) ?>">
+      <?php endforeach; ?>
+      <input type="hidden"
+             name="confirm_new" value="1">
+      <button type="submit" style="
+        background:transparent;
+        border:1px solid #1e1e3a;
+        color:#555;border-radius:8px;
+        padding:0.45rem 1.1rem;
+        font-size:0.82rem;cursor:pointer;
+      ">
+        No, I am a different person —
+        create a new profile
+      </button>
+    </form>
+  </div>
+  <?php endif; ?>
 
   <!-- ── SECTION 1: MY INFORMATION ──────────── -->
   <div style="
