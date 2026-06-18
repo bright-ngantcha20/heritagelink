@@ -1279,17 +1279,18 @@ function showDetail(n) {
                         flex-direction:column;
                         gap:0.5rem;margin-top:0.5rem;">
                 ${!isRoot ? (n.is_user ? `
-                <button onclick="startMessage(n)"
-                        style="background:#00d4ff;
-                               border:none;color:#000;
-                               padding:0.65rem;
-                               border-radius:8px;
-                               font-size:0.85rem;
-                               font-weight:600;
-                               cursor:pointer;
-                               width:100%;">
+                <a href="${SITE_URL}/messages/inbox.php?${n.account_user_id ? 'to=' + n.account_user_id : 'member=' + n.id}"
+                   style="background:#00d4ff;
+                          display:block;
+                          text-align:center;
+                          color:#000;
+                          padding:0.65rem;
+                          border-radius:8px;
+                          font-size:0.85rem;
+                          font-weight:600;
+                          text-decoration:none;">
                     💬 Send Message
-                </button>` : `
+                </a>` : `
                 <div style="background:rgba(255,255,255,0.03);
                             border:1px solid #1e1e3a;
                             border-radius:8px;
@@ -1319,18 +1320,6 @@ function showDetail(n) {
                           text-align:center;
                           text-decoration:none;">
                     + Add Their Relative
-                </a>
-                <a href="${SITE_URL}/family/edit.php?id=${n.id}"
-                   style="background:rgba(255,255,255,0.03);
-                          border:1px solid #1e1e3a;
-                          color:#666;padding:0.5rem;
-                          border-radius:8px;
-                          font-size:0.82rem;
-                          display:block;
-                          text-align:center;
-                          text-decoration:none;
-                          margin-top:0.4rem;">
-                    ✎ Propose an Edit
                 </a>
             </div>
         `;
@@ -1373,17 +1362,15 @@ function zoomOut() {
 // ── Send Message ──────────────────────────────
 function startMessage(nodeOrMember) {
     if (!nodeOrMember.is_user) return;
-    const memberId = nodeOrMember.id
-        || nodeOrMember.member_id;
-    const userId   = nodeOrMember.account_user_id;
-
-    if (userId) {
-        // Direct route via user_id
+    // Use account_user_id if available (direct),
+    // otherwise fall back to member lookup
+    if (nodeOrMember.account_user_id) {
         window.location.href =
             `${SITE_URL}/messages/inbox.php`
-            + `?to=${userId}`;
+            + `?to=${nodeOrMember.account_user_id}`;
     } else {
-        // Fallback: look up user from member_id
+        const memberId = nodeOrMember.id
+            || nodeOrMember.member_id;
         window.location.href =
             `${SITE_URL}/messages/inbox.php`
             + `?member=${memberId}`;
@@ -1698,16 +1685,18 @@ function showSearchedMember(m) {
         <div style="display:flex;flex-direction:column;
                     gap:0.5rem;">
             ${member.is_user ? `
-            <button onclick="startMessage(member)"
-                    style="background:#00d4ff;
-                           border:none;color:#000;
-                           padding:0.65rem;
-                           border-radius:8px;
-                           font-size:0.85rem;
-                           font-weight:600;
-                           cursor:pointer;width:100%;">
+            <a href="${SITE_URL}/messages/inbox.php?${member.account_user_id ? 'to=' + member.account_user_id : 'member=' + (member.id || member.member_id)}"
+               style="background:#00d4ff;
+                      display:block;
+                      text-align:center;
+                      color:#000;
+                      padding:0.65rem;
+                      border-radius:8px;
+                      font-size:0.85rem;
+                      font-weight:600;
+                      text-decoration:none;">
                 💬 Send Message
-            </button>` : `
+            </a>` : `
             <div style="background:rgba(255,255,255,0.03);
                         border:1px solid #1e1e3a;
                         border-radius:8px;
