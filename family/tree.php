@@ -1321,6 +1321,18 @@ function showDetail(n) {
                           text-decoration:none;">
                     + Add Their Relative
                 </a>
+                <a href="${SITE_URL}/family/edit.php?id=${n.id}"
+                   style="background:rgba(255,255,255,0.03);
+                          border:1px solid #1e1e3a;
+                          color:#666;padding:0.5rem;
+                          border-radius:8px;
+                          font-size:0.82rem;
+                          display:block;
+                          text-align:center;
+                          text-decoration:none;
+                          margin-top:0.4rem;">
+                    ✎ Propose an Edit
+                </a>
             </div>
         `;
     } catch(e) {

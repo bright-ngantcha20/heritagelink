@@ -6,6 +6,10 @@ require_once '../includes/functions.php';
 
 requireLogin();
 
+// Pre-generate CSRF token on every GET load
+// so it is always ready before form submission
+csrfToken();
+
 $user       = currentUser();
 $errors     = [];
 $success    = false;

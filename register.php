@@ -73,7 +73,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              (user_id) VALUES (?)"
         )->execute([$new_id]);
 
-        $success = true;
+        // Store success flash in session
+        // then redirect so form is cleared
+        // and back button won't re-submit
+        $_SESSION['register_success'] =
+            $full_name;
+        header('Location: '
+            . SITE_URL . '/login.php'
+            . '?registered=1');
+        exit;
     }
 }
 
@@ -85,15 +93,6 @@ $quarters = getAllQuarters($pdo);
   <div class="auth-card">
     <h2>Create Your Account</h2>
     <p>Join the Ekpor Village heritage community.</p>
-
-    <?php if ($success): ?>
-      <div class="alert alert-success">
-        Account created successfully.
-        <a href="<?= SITE_URL ?>/login.php">
-          Sign in now →
-        </a>
-      </div>
-    <?php endif; ?>
 
     <?php foreach ($errors as $e): ?>
       <div class="alert alert-danger">
@@ -203,4 +202,9 @@ $quarters = getAllQuarters($pdo);
   </div>
 </main>
 
-<?php require_once 'includes/footer.php'; ?>
+<?php require_once 'includes/footer.php';
+
+// Ensure CSRF token is ready
+if (empty(\$_SESSION['csrf_token'])) {
+    \$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+} ?>

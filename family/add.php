@@ -217,10 +217,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // ── Check for existing members with
             // same name before inserting ──────────
             $dupe_check = $pdo->prepare("
-                SELECT member_id, full_name,
-                       gender, birthplace,
-                       date_of_birth,
-                       quarter_id,
+                SELECT fm.member_id, fm.full_name,
+                       fm.gender, fm.birthplace,
+                       fm.date_of_birth,
+                       fm.quarter_id,
                        q.name AS quarter_name
                 FROM family_members fm
                 LEFT JOIN quarters q
@@ -248,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Don't insert — fall through to
                 // show the form with prompt
             } else {
-            INSERT INTO family_members (
+            $stmt = $pdo->prepare("INSERT INTO family_members (
                 full_name, preferred_name,
                 gender, date_of_birth,
                 dob_approximate,

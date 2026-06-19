@@ -8,6 +8,12 @@ function requireLogin() {
         header('Location: ' . SITE_URL . '/login.php');
         exit;
     }
+    // Ensure CSRF token exists for every
+    // authenticated page that has forms
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] =
+            bin2hex(random_bytes(32));
+    }
 }
 
 function requireAdmin() {
