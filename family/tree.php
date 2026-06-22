@@ -426,13 +426,40 @@ async function loadTree() {
             (data.counts.total !== 1 ? 's' : '');
 
         visibleNodeIds = new Set([ROOT_ID]);
+
+        // Add all direct connections of ROOT
+        const directOfRoot = new Set();
         allLinks.forEach(l => {
             const src = l.source.id ?? l.source;
             const tgt = l.target.id ?? l.target;
             if (src === ROOT_ID)
-                visibleNodeIds.add(tgt);
+                directOfRoot.add(tgt);
             if (tgt === ROOT_ID)
-                visibleNodeIds.add(src);
+                directOfRoot.add(src);
+        });
+        directOfRoot.forEach(id =>
+            visibleNodeIds.add(id)
+        );
+
+        // For each direct connection, only
+        // auto-expand their ancestors (upward).
+        // Do NOT auto-expand their children —
+        // those only appear when the user clicks
+        // the + button on that node.
+        directOfRoot.forEach(nodeId => {
+            allLinks.forEach(l => {
+                const src  = l.source.id ?? l.source;
+                const tgt  = l.target.id ?? l.target;
+                if (src === nodeId
+                    && l.type === 'child') {
+                    visibleNodeIds.add(tgt);
+                }
+                if (tgt === nodeId
+                    && l.type === 'parent'
+                    && !directOfRoot.has(src)) {
+                    visibleNodeIds.add(src);
+                }
+            });
         });
 
         initSVG();
@@ -557,6 +584,69 @@ function buildAndRender() {
         if (levelMap[n.id] === undefined)
             levelMap[n.id] = 0;
     });
+
+    // ── Pass 1: Generation correction ─────────
+    // Push any node that has type=parent links
+    // ABOVE its children. Fixes Tabi being at
+    // sibling level even though he has children.
+    let corrected = true;
+    let pass = 0;
+    while (corrected && pass < 20) {
+        corrected = false;
+        pass++;
+        allLinks.forEach(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            if (l.type === 'parent') {
+                if ((levelMap[src] ?? 0)
+                    >= (levelMap[tgt] ?? 0)) {
+                    levelMap[src] =
+                        (levelMap[tgt] ?? 0) - 1;
+                    corrected = true;
+                }
+            }
+        });
+    }
+
+    // ── Pass 2: Sibling alignment ──────────────
+    // After Pass 1, siblings may be on different
+    // levels (Tabi moved up, Ndumbe stayed).
+    // Set all siblings to the MINIMUM level
+    // (highest up) among them so they share a row.
+    allLinks.forEach(l => {
+        const src = l.source.id ?? l.source;
+        const tgt = l.target.id ?? l.target;
+        if (l.type === 'sibling') {
+            const minLv = Math.min(
+                levelMap[src] ?? 0,
+                levelMap[tgt] ?? 0
+            );
+            levelMap[src] = minLv;
+            levelMap[tgt] = minLv;
+        }
+    });
+
+    // ── Pass 3: Re-run generation correction ───
+    // Sibling alignment may have shifted a node
+    // down, violating parent>child constraints.
+    corrected = true;
+    pass = 0;
+    while (corrected && pass < 20) {
+        corrected = false;
+        pass++;
+        allLinks.forEach(l => {
+            const src = l.source.id ?? l.source;
+            const tgt = l.target.id ?? l.target;
+            if (l.type === 'parent') {
+                if ((levelMap[src] ?? 0)
+                    >= (levelMap[tgt] ?? 0)) {
+                    levelMap[src] =
+                        (levelMap[tgt] ?? 0) - 1;
+                    corrected = true;
+                }
+            }
+        });
+    }
 
     const levels = {};
     nodes.forEach(n => {

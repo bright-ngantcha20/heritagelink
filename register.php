@@ -203,8 +203,4 @@ $quarters = getAllQuarters($pdo);
 </main>
 
 <?php require_once 'includes/footer.php';
-
-// Ensure CSRF token is ready
-if (empty(\$_SESSION['csrf_token'])) {
-    \$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-} ?>
+?>
