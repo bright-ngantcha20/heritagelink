@@ -40,7 +40,7 @@
       <a href="<?= SITE_URL ?>/settings/privacy.php">
         Privacy Policy
       </a>
-      <a href="#">Terms of Use</a>
+      <a href="<?= SITE_URL ?>/settings/privacy.php">Terms of Use</a>
     </div>
   </div>
 </footer>

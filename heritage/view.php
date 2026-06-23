@@ -328,8 +328,7 @@ $tlabel = $type_labels[$record['type']] ?? 'Record';
           <i class="ti ti-shield me-1"></i>
           Admin
         </span>
-        <a href="<?= SITE_URL ?>/admin/edit_record.php
-                 ?id=<?= $record['record_id'] ?>"
+        <a href="<?= SITE_URL ?>/admin/edit_record.php?id=<?= $record['record_id'] ?>"
            style="
              color:#aaa;font-size:0.82rem;
              text-decoration:none;
@@ -426,8 +425,7 @@ $tlabel = $type_labels[$record['type']] ?? 'Record';
           $ricon = $type_icons[$rel['type']] ?? 'ti-file';
           $recolor = $era_colors[$rel['era']] ?? '#888';
         ?>
-        <a href="<?= SITE_URL ?>/heritage/view.php
-                 ?id=<?= $rel['record_id'] ?>"
+        <a href="<?= SITE_URL ?>/heritage/view.php?id=<?= $rel['record_id'] ?>"
            style="
              display:flex;align-items:flex-start;
              gap:0.6rem;padding:0.6rem 0;
@@ -449,9 +447,7 @@ $tlabel = $type_labels[$record['type']] ?? 'Record';
         </a>
         <?php endforeach; ?>
 
-        <a href="<?= SITE_URL ?>/heritage/history.php
-                 <?= $record['era']
-                     ? '?era='.$record['era'] : '' ?>"
+        <a href="<?= SITE_URL ?>/heritage/history.php<?= $record['era'] ? '?era='.$record['era'] : '' ?>"
            style="
              display:block;margin-top:0.75rem;
              font-size:0.78rem;color:#00d4ff;

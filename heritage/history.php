@@ -298,8 +298,7 @@ $type_labels = [
     $tlbl  = $type_labels[$rec['type']] ?? 'Record';
     $ecolor_rec = $era_colors[$rec['era'] ?? ''] ?? '#888';
   ?>
-  <a href="<?= SITE_URL ?>/heritage/view.php
-            ?id=<?= $rec['record_id'] ?>"
+  <a href="<?= SITE_URL ?>/heritage/view.php?id=<?= $rec['record_id'] ?>"
      style="text-decoration:none">
     <div class="record-card">
 
