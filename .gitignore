@@ -45,4 +45,4 @@ npm-debug.log
 *.temp
 *.bak
 *.swp
-*~
+*~"config.php" 
